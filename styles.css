@@ -335,12 +335,12 @@ body {
   max-width: 440px;
   padding: 4px 16px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
 }
 
 .numpad-btn {
-  height: 48px;
+  height: 36px;
   border: none;
   border-radius: 12px;
   font-size: 1.25rem;
@@ -367,7 +367,6 @@ body {
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.6);
   font-size: 1.1rem;
-  grid-column: span 2;
 }
 
 .num-save {
@@ -376,7 +375,6 @@ body {
   font-size: 0.9rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  grid-column: span 2;
 }
 
 .num-save:active {
