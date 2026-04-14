@@ -787,9 +787,6 @@ function pressSave() {
   display.classList.add('flash');
   setTimeout(() => display.classList.remove('flash'), 400);
 
-  // Toast
-  showToast(existing ? 'Updated!' : 'Saved!');
-
   // For dual positions, switch to other direction if unfilled
   if (isDual) {
     const otherDir = state.direction === 'L' ? 'R' : 'L';
