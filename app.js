@@ -631,12 +631,11 @@ function renderDisplay() {
     : getEntry(state.selectedBall, state.selectedPosition);
 
   if (entry && entry.attempts) {
-    const dirLabel = isDual ? `${state.direction}: ` : '';
-    hint.textContent = `${dirLabel}saved: ${entry.attempts} (${entry.type})`;
-    hint.className = `saved-hint ${entry.type === 'bank' ? 'bank-hint' : 'cut-hint'}`;
+    hint.textContent = '';
+    hint.className = 'saved-hint';
   } else {
     hint.textContent = isDual ? `${state.direction}: —` : '';
-    hint.className = 'saved-hint cut-hint';
+    hint.className = 'saved-hint';
   }
 
   // Note input
