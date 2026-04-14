@@ -1,0 +1,12 @@
+# Bank positions: ball number → cue-ball positions that are bank shots.
+# Everything not listed here defaults to "cut".
+# Format:  ballNumber: ["col,row", ...]
+
+4: ["2,3"]
+4: ["1,3"]
+4: ["1,2"]
+6: ["1,2"]
+6: ["1,1"]
+6: ["3,1"]
+7: ["4,3"]
+7: ["3,3"]

@@ -1,0 +1,4 @@
+# Excluded positions: ball number → cue-ball positions to skip entirely.
+# Format:  ballNumber: ["col,row", ...]
+
+2: ["6,2"]

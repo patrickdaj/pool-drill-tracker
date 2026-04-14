@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0f0f1a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Track billiards drill performance — attempts per ball and cue position">
+  <title>Pool Drill Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Pool <span class="accent">Drill</span> Tracker</h1>
+    <div class="header-actions">
+      <a href="stats.html" class="header-btn">Stats</a>
+      <button class="header-btn" id="btn-export">Export</button>
+    </div>
+  </div>
+
+  <!-- Session Bar -->
+  <div class="session-bar">
+    <select id="session-select" aria-label="Select session"></select>
+    <button id="btn-new-session">+ New</button>
+    <button id="btn-reset">Reset</button>
+    <button id="btn-delete-session">Delete</button>
+    <button id="btn-reset-all">Reset All</button>
+  </div>
+
+  <!-- Table Diagram -->
+  <div class="table-container" id="table-diagram"></div>
+
+  <!-- Ball Selector -->
+  <div class="selector-section">
+    <div class="selector-label">Ball</div>
+    <div class="ball-grid" id="ball-row"></div>
+  </div>
+
+  <!-- Input Row -->
+  <div class="input-row">
+    <div class="attempt-display" id="attempt-display">
+      <span class="attempt-number" id="attempt-number">0</span>
+      <span class="saved-hint cut-hint" id="saved-hint"></span>
+    </div>
+    <div class="shot-toggle-col">
+      <div class="shot-type-badge" id="shot-type-badge">cut</div>
+      <div class="dir-toggle" id="dir-toggle" style="display:none">
+        <button class="dir-btn dir-active" id="btn-dir-l">L</button>
+        <button class="dir-btn" id="btn-dir-r">R</button>
+      </div>
+    </div>
+    <div class="totals-col">
+      <div class="stat-card">
+        <div class="stat-label" id="ball-total-label2">Ball 1</div>
+        <div class="stat-value" id="ball-total-value2">0</div>
+        <div class="stat-sub" id="ball-total-sub2">0/13</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Session</div>
+        <div class="stat-value" id="session-total-value2">0</div>
+        <div class="stat-sub" id="session-total-sub2">0/159</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note -->
+  <div class="note-row">
+    <input type="text" id="note-input" class="note-input" placeholder="Note for this position…" maxlength="80" autocomplete="off">
+  </div>
+
+  <!-- Number Pad -->
+  <div class="numpad">
+    <button class="numpad-btn num-digit" data-digit="2">2</button>
+    <button class="numpad-btn num-digit" data-digit="3">3</button>
+    <button class="numpad-btn num-digit" data-digit="4">4</button>
+    <button class="numpad-btn num-digit" data-digit="5">5</button>
+    <button class="numpad-btn num-digit" data-digit="6">6</button>
+    <button class="numpad-btn num-digit" data-digit="7">7</button>
+    <button class="numpad-btn num-digit" data-digit="8">8</button>
+    <button class="numpad-btn num-digit" data-digit="9">9</button>
+    <button class="numpad-btn num-backspace" id="btn-backspace">⌫</button>
+    <button class="numpad-btn num-save" id="btn-save">Save</button>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Position Popover -->
+  <div class="pos-popover" id="pos-popover" style="display:none">
+    <div class="pos-popover-title" id="pos-popover-title">Position 3,1</div>
+    <input type="text" id="pos-label-input" class="pos-label-input" placeholder="Label (e.g. cross-bank)" maxlength="40" autocomplete="off">
+    <label class="pos-skip-label">
+      <input type="checkbox" id="pos-skip-check">
+      <span>Skip this position</span>
+    </label>
+    <button class="pos-popover-close" id="pos-popover-close">Done</button>
+  </div>
+  <div class="pos-popover-backdrop" id="pos-popover-backdrop" style="display:none"></div>
+
+
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js');
+      });
+    }
+  </script>
+</body>
+</html>
