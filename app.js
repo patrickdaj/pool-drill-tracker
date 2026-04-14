@@ -98,6 +98,14 @@ function parsePocketYaml(text) {
   for (const line of text.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
+    // Position-specific override with dual pockets: 5@6,2: [TL, TR]  (L→TL, R→TR)
+    const mod = trimmed.match(/^(\d+)@(\d+,\d+):\s*\[\s*(\w+)\s*,\s*(\w+)\s*\]$/);
+    if (mod) {
+      const ball = parseInt(mod[1], 10);
+      if (!result[ball]) result[ball] = {};
+      result[ball][mod[2]] = { L: mod[3], R: mod[4] };
+      continue;
+    }
     // Position-specific override: 2@6,2: TL
     const mo = trimmed.match(/^(\d+)@(\d+,\d+):\s*(\w+)$/);
     if (mo) {
@@ -116,12 +124,19 @@ function parsePocketYaml(text) {
   return result;
 }
 
-/** Get the pocket target for a ball at a specific CB position. */
-function getPocketTarget(ballNum, posKey) {
+/** Get the pocket target for a ball at a specific CB position.
+ *  direction: 'L' or 'R' for dual positions with [L, R] pocket pairs. */
+function getPocketTarget(ballNum, posKey, direction) {
   const entry = POCKET_TARGETS[ballNum];
   if (!entry) return null;
   const clean = posKey ? posKey.replace(/:.*/, '') : null;
-  if (clean && entry[clean]) return entry[clean];
+  if (clean && entry[clean]) {
+    const val = entry[clean];
+    if (typeof val === 'object') {
+      return (direction && val[direction]) || val.L;
+    }
+    return val;
+  }
   return entry._default || null;
 }
 
@@ -156,7 +171,8 @@ function getCutAngle(ballNum, posKey) {
   const bp = BALL_POSITIONS[ballNum];
   const parts = posKey.replace(/:.*/, '').split(',');
   const cc = parseInt(parts[0], 10), cr = parseInt(parts[1], 10);
-  const pk = POCKET_COORDS[getPocketTarget(ballNum, posKey)];
+  const dirMatch = posKey.match(/:([LR])$/);
+  const pk = POCKET_COORDS[getPocketTarget(ballNum, posKey, dirMatch ? dirMatch[1] : null)];
   if (!pk) return null;
   const tx = pk.col - bp.col, ty = pk.row - bp.row;
   const ax = bp.col - cc, ay = bp.row - cr;
@@ -173,7 +189,8 @@ function getCutDirection(ballNum, posKey) {
   const bp = BALL_POSITIONS[ballNum];
   const parts = posKey.replace(/:.*/, '').split(',');
   const cc = parseInt(parts[0], 10), cr = parseInt(parts[1], 10);
-  const pk = POCKET_COORDS[getPocketTarget(ballNum, posKey)];
+  const dirMatch = posKey.match(/:([LR])$/);
+  const pk = POCKET_COORDS[getPocketTarget(ballNum, posKey, dirMatch ? dirMatch[1] : null)];
   if (!pk) return null;
   const tx = pk.col - bp.col, ty = pk.row - bp.row;
   const ax = bp.col - cc, ay = bp.row - cr;
@@ -471,7 +488,7 @@ function renderTableDiagram() {
   }
 
   // Highlight the target pocket for the selected ball (position-specific if selected)
-  const targetPocketId = getPocketTarget(state.selectedBall, state.selectedPosition);
+  const targetPocketId = getPocketTarget(state.selectedBall, state.selectedPosition, state.direction || null);
   const targetPocket = POCKET_COORDS[targetPocketId];
   if (targetPocket) {
     const bp = BALL_POSITIONS[state.selectedBall];
@@ -649,8 +666,10 @@ function renderShotInfo() {
     el.innerHTML = '<span class="shot-info-bank">Bank Shot</span>';
     return;
   }
-  const angle = getCutAngle(b, pk);
-  const dir = getCutDirection(b, pk);
+  const isDual = isDualPosition(b, pk);
+  const fullKey = isDual && state.direction ? pk + ':' + state.direction : pk;
+  const angle = getCutAngle(b, fullKey);
+  const dir = getCutDirection(b, fullKey);
   if (angle === null) { el.textContent = ''; return; }
   const dirLabel = dir === 'left' ? 'Left' : dir === 'right' ? 'Right' : 'Straight';
   const name = angleName(angle);

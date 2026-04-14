@@ -2,6 +2,7 @@
 #
 # Default per ball:       ballNumber: PocketID
 # Per CB position:        ballNumber@col,row: PocketID
+# Dual position:          ballNumber@col,row: [L_pocket, R_pocket]
 #
 # Pocket IDs (matching the 6 table pockets):
 #   BL = Bottom-Left corner   (grid 0, 0)
@@ -18,6 +19,7 @@
 #   Left side:   1,2
 
 1: BL
+
 2: BL
 2@1,1: TL
 2@2,1: TL
@@ -25,13 +27,100 @@
 2@4,1: TL
 2@5,1: TL
 2@6,1: TL
+
 3: TL
+
 4: BL
+4@2,3: TS
+4@1,3: TS
+4@1,2: TS
+4@1,1: BR
+
 5: BS
+5@3,1: TL
+5@4,1: TL
+5@5,1: TL
+5@6,1: TL
+5@6,2: [BL, TL]
+5@6,3: BL
+5@5,3: BL
+5@4,3: BL
+5@3,3: BL
+5@2,3: [BS, BL]
+5@1,2: [TR, BR]
+5@1,1: TS
+5@2,1: [TL, TS]
+
 6: TL
-7: BS
+6@1,3: TR
+6@1,2: BS
+6@1,1: BS
+
+7: BL
+7@3,3: TS
+7@2,3: BS
+7@1,3: BS
+7@1,2: BR
+7@1,1: BR
+7@2,1: BR
+
 8: BS
-9: TS
+8@4,1: TL
+8@5,1: TL
+8@6,1: TL
+8@6,2: [BL, TL]
+8@6,3: BL
+8@5,3: BL
+8@4,3: BL
+8@1,3: BR
+8@1,2: [TR, BR]
+8@1,1: TR
+8@2,1: TS
+8@3,1: TS
+
+9: TL
+9@2,3: TR
+9@1,3: TR
+9@1,2: TR
+9@1,1: TS
+9@2,1: TS
+9@3,1: TS
+
 10: BS
+10@5,1: BL
+10@6,1: BL
+10@6,2: BL
+10@6,3: BL
+10@2,3: BR
+10@1,3: BR
+10@1,2: BR
+10@1,1: BR
+10@2,1: BR
+10@3,1: BR
+
 11: BS
+11@5,1: TL
+11@6,1: TL
+11@6,2: [BL, TL]
+11@6,3: BL
+11@5,3: BL
+11@3,3: BR
+11@2,3: BR
+11@1,3: BR
+11@1,2: [TR, BR]
+11@1,1: TR
+11@2,1: TR
+11@3,1: TR
+11@4,1: TS
+
 12: TS
+12@3,3: TR
+12@2,3: TR
+12@1,3: TR
+12@1,2: TR
+12@1,1: TR
+12@2,1: TR
+12@6,1: TL
+12@6,2: TL
+12@6,3: TL
+12@5,3: TL
