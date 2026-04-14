@@ -37,9 +37,16 @@
     <button id="btn-reset-all">Reset All</button>
   </div>
 
-  <!-- Table Diagram -->
-  <div class="table-container" id="table-diagram"></div>
-  <div class="shot-info" id="shot-info"></div>
+  <div class="main-layout">
+    <!-- Left: Table -->
+    <div class="main-left">
+      <!-- Table Diagram -->
+      <div class="table-container" id="table-diagram"></div>
+      <div class="shot-info" id="shot-info"></div>
+    </div>
+
+    <!-- Right: Controls -->
+    <div class="main-right">
 
   <!-- Ball Selector -->
   <div class="selector-section">
@@ -74,11 +81,6 @@
     </div>
   </div>
 
-  <!-- Note -->
-  <div class="note-row">
-    <input type="text" id="note-input" class="note-input" placeholder="Note for this position…" maxlength="80" autocomplete="off">
-  </div>
-
   <!-- Number Pad -->
   <div class="numpad">
     <button class="numpad-btn num-digit" data-digit="1">1</button>
@@ -94,6 +96,14 @@
     <button class="numpad-btn num-digit" data-digit="0">0</button>
     <button class="numpad-btn num-save" id="btn-save">Save</button>
   </div>
+
+  <!-- Note -->
+  <div class="note-row">
+    <input type="text" id="note-input" class="note-input" placeholder="Note for this position…" maxlength="80" autocomplete="off">
+  </div>
+
+    </div><!-- .main-right -->
+  </div><!-- .main-layout -->
 
   <!-- Toast -->
   <div class="toast" id="toast"></div>

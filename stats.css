@@ -284,3 +284,10 @@
 .stats-pos-pct.pct-good { color: #6ee7a0; }
 .stats-pos-pct.pct-ok { color: #e8a23a; }
 .stats-pos-pct.pct-bad { color: #e87a5a; }
+
+/* ===== Wide Screen ===== */
+@media (min-width: 768px) {
+  .stats-page {
+    max-width: 720px;
+  }
+}

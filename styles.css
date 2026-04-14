@@ -538,3 +538,73 @@ body {
   opacity: 1;
 }
 
+/* ===== Wide Screen Layout ===== */
+@media (min-width: 768px) {
+  body {
+    align-items: stretch;
+  }
+
+  .header {
+    max-width: none;
+    padding: 10px 24px 4px;
+  }
+
+  .session-bar {
+    max-width: none;
+    padding: 2px 24px 6px;
+  }
+
+  .main-layout {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 8px 24px;
+    flex: 1;
+  }
+
+  .main-left {
+    flex: 1;
+    max-width: 600px;
+    min-width: 360px;
+  }
+
+  .main-left .table-container {
+    max-width: none;
+    padding: 4px 0;
+  }
+
+  .main-left .shot-info {
+    max-width: none;
+    padding: 2px 0 4px;
+  }
+
+  .main-right {
+    flex: 0 0 340px;
+    max-width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .main-right .selector-section {
+    max-width: none;
+    padding: 4px 0;
+  }
+
+  .main-right .input-row {
+    max-width: none;
+    padding: 6px 0;
+  }
+
+  .main-right .numpad {
+    max-width: none;
+    padding: 4px 0;
+  }
+
+  .main-right .note-row {
+    max-width: none;
+    padding: 0 0 4px;
+  }
+}
+
