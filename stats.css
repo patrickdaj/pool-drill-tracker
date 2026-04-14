@@ -288,6 +288,53 @@
 /* ===== Wide Screen ===== */
 @media (min-width: 768px) {
   .stats-page {
-    max-width: 720px;
+    max-width: 960px;
+    padding: 8px 24px 24px;
+  }
+
+  /* Two-column grid for the stat sections */
+  .stats-page {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 24px;
+  }
+
+  /* View tabs span full width */
+  .stats-view-tabs {
+    grid-column: 1 / -1;
+  }
+
+  /* Each section fills one column cell */
+  .stats-section {
+    margin-bottom: 12px;
+  }
+
+  /* Per-ball breakdown spans both columns */
+  .stats-section:nth-last-child(-n+2) {
+    grid-column: 1 / -1;
+  }
+
+  .stats-grid-angle {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  .stats-item {
+    padding: 8px 6px;
+    border-radius: 10px;
+  }
+
+  .stats-item-value {
+    font-size: 1.2rem;
+  }
+
+  /* Compact per-ball rows */
+  .stats-ball-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+
+  .stats-ball-row {
+    padding: 7px 8px;
   }
 }

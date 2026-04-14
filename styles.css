@@ -539,34 +539,46 @@ body {
 }
 
 /* ===== Wide Screen Layout ===== */
+
+/* Mobile: main-layout is transparent, everything behaves as before */
+.main-layout {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.main-left, .main-right {
+  width: 100%;
+}
+
 @media (min-width: 768px) {
   body {
-    align-items: stretch;
+    align-items: center;
   }
 
   .header {
-    max-width: none;
+    max-width: 960px;
     padding: 10px 24px 4px;
   }
 
   .session-bar {
-    max-width: none;
+    max-width: 960px;
     padding: 2px 24px 6px;
   }
 
   .main-layout {
-    display: flex;
+    max-width: 960px;
     flex-direction: row;
     align-items: flex-start;
     gap: 24px;
-    padding: 8px 24px;
-    flex: 1;
+    padding: 4px 24px;
   }
 
   .main-left {
     flex: 1;
-    max-width: 600px;
-    min-width: 360px;
+    min-width: 0;
   }
 
   .main-left .table-container {
@@ -580,11 +592,8 @@ body {
   }
 
   .main-right {
-    flex: 0 0 340px;
-    max-width: 340px;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+    flex: 0 0 320px;
+    max-width: 320px;
   }
 
   .main-right .selector-section {
@@ -592,19 +601,63 @@ body {
     padding: 4px 0;
   }
 
+  .main-right .ball-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+  }
+
+  .main-right .ball-pill {
+    height: 30px;
+    font-size: 0.72rem;
+    border-radius: 8px;
+  }
+
   .main-right .input-row {
     max-width: none;
-    padding: 6px 0;
+    padding: 4px 0;
+  }
+
+  .main-right .attempt-display {
+    font-size: 2rem;
+    min-height: 44px;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .main-right .stat-card {
+    padding: 3px 6px;
+    border-radius: 8px;
+  }
+
+  .main-right .stat-card .stat-value {
+    font-size: 0.95rem;
   }
 
   .main-right .numpad {
     max-width: none;
     padding: 4px 0;
+    gap: 3px;
+  }
+
+  .main-right .numpad-btn {
+    height: 30px;
+    font-size: 1rem;
+    border-radius: 8px;
+  }
+
+  .main-right .num-save {
+    font-size: 0.8rem;
   }
 
   .main-right .note-row {
     max-width: none;
-    padding: 0 0 4px;
+    padding: 2px 0 0;
+  }
+
+  .main-right .note-input {
+    padding: 4px 8px;
+    font-size: 14px;
+    border-radius: 6px;
   }
 }
 
