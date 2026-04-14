@@ -114,8 +114,13 @@
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
+      // Auto-reload when a new service worker takes control
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) { refreshing = true; window.location.reload(); }
+      });
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js').then((reg) => {
+        navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).then((reg) => {
           reg.update();
         });
       });
