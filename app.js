@@ -55,7 +55,7 @@ let DUAL_POSITIONS = {};
     Everything else is cut. Loaded from bank-positions.yaml */
 let BANK_POSITIONS = {};
 
-/** Pocket target per ball — loaded from pocket-targets.yaml */
+/** Pocket target per ball (with optional per-CB-position overrides) — loaded from pocket-targets.yaml */
 let POCKET_TARGETS = {};
 
 /** The 6 pocket positions on the table grid. */
@@ -89,18 +89,40 @@ function parsePositionYaml(text) {
 }
 
 /**
- * Parse pocket-targets.yaml:  ballNumber: PocketID
+ * Parse pocket-targets.yaml:
+ *   ballNumber: PocketID              (default pocket for ball)
+ *   ballNumber@col,row: PocketID      (override for specific CB position)
  */
 function parsePocketYaml(text) {
   const result = {};
   for (const line of text.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
-    const m = trimmed.match(/^(\d+):\s*(\w+)$/);
-    if (!m) continue;
-    result[parseInt(m[1], 10)] = m[2];
+    // Position-specific override: 2@6,2: TL
+    const mo = trimmed.match(/^(\d+)@(\d+,\d+):\s*(\w+)$/);
+    if (mo) {
+      const ball = parseInt(mo[1], 10);
+      if (!result[ball]) result[ball] = {};
+      result[ball][mo[2]] = mo[3];
+      continue;
+    }
+    // Default: 2: BL
+    const md = trimmed.match(/^(\d+):\s*(\w+)$/);
+    if (!md) continue;
+    const ball = parseInt(md[1], 10);
+    if (!result[ball]) result[ball] = {};
+    result[ball]._default = md[2];
   }
   return result;
+}
+
+/** Get the pocket target for a ball at a specific CB position. */
+function getPocketTarget(ballNum, posKey) {
+  const entry = POCKET_TARGETS[ballNum];
+  if (!entry) return null;
+  const clean = posKey ? posKey.replace(/:.*/, '') : null;
+  if (clean && entry[clean]) return entry[clean];
+  return entry._default || null;
 }
 
 async function loadPositionConfigs() {
@@ -134,7 +156,7 @@ function getCutAngle(ballNum, posKey) {
   const bp = BALL_POSITIONS[ballNum];
   const parts = posKey.replace(/:.*/, '').split(',');
   const cc = parseInt(parts[0], 10), cr = parseInt(parts[1], 10);
-  const pk = POCKET_COORDS[POCKET_TARGETS[ballNum]];
+  const pk = POCKET_COORDS[getPocketTarget(ballNum, posKey)];
   if (!pk) return null;
   const tx = pk.col - bp.col, ty = pk.row - bp.row;
   const ax = bp.col - cc, ay = bp.row - cr;
@@ -151,7 +173,7 @@ function getCutDirection(ballNum, posKey) {
   const bp = BALL_POSITIONS[ballNum];
   const parts = posKey.replace(/:.*/, '').split(',');
   const cc = parseInt(parts[0], 10), cr = parseInt(parts[1], 10);
-  const pk = POCKET_COORDS[POCKET_TARGETS[ballNum]];
+  const pk = POCKET_COORDS[getPocketTarget(ballNum, posKey)];
   if (!pk) return null;
   const tx = pk.col - bp.col, ty = pk.row - bp.row;
   const ax = bp.col - cc, ay = bp.row - cr;
@@ -448,8 +470,8 @@ function renderTableDiagram() {
     svg += `<circle cx="${dx(c)}" cy="${dy(r)}" r="${pocketR - 2}" fill="none" stroke="#1a1a1a" stroke-width="1"/>`;
   }
 
-  // Highlight the target pocket for the selected ball
-  const targetPocketId = POCKET_TARGETS[state.selectedBall];
+  // Highlight the target pocket for the selected ball (position-specific if selected)
+  const targetPocketId = getPocketTarget(state.selectedBall, state.selectedPosition);
   const targetPocket = POCKET_COORDS[targetPocketId];
   if (targetPocket) {
     const bp = BALL_POSITIONS[state.selectedBall];

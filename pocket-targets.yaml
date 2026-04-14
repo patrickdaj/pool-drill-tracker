@@ -1,5 +1,7 @@
 # Pocket targets: which pocket each ball is aimed at.
-# One entry per line:  ballNumber: PocketID
+#
+# Default per ball:       ballNumber: PocketID
+# Per CB position:        ballNumber@col,row: PocketID
 #
 # Pocket IDs (matching the 6 table pockets):
 #   BL = Bottom-Left corner   (grid 0, 0)
@@ -8,6 +10,12 @@
 #   TS = Top-Side pocket      (grid 4, 4)
 #   BR = Bottom-Right corner  (grid 8, 0)
 #   TR = Top-Right corner     (grid 8, 4)
+#
+# CB perimeter positions (col,row):
+#   Bottom rail: 1,1  2,1  3,1  4,1  5,1  6,1
+#   Right side:  6,2  6,3
+#   Top rail:    5,3  4,3  3,3  2,3  1,3
+#   Left side:   1,2
 
 1: BL
 2: BL

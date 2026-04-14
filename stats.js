@@ -345,7 +345,7 @@ function renderStats() {
     const posCount = getCuePositions(b).length;
     const pct = posCount > 0 ? Math.round((bs.filled / posCount) * 100) : 0;
     const isExpanded = expandedBall === b;
-    const pocketId = POCKET_TARGETS[b] || '?';
+    const pocketId = getPocketTarget(b) || '?';
     ballHtml += `<div class="stats-ball-row" data-stats-ball="${b}">
       <span class="stats-ball-num">B${b}</span>
       <span class="stats-ball-pocket">${pocketId}</span>
