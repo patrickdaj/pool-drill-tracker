@@ -104,16 +104,20 @@ function parsePocketYaml(text) {
 }
 
 async function loadPositionConfigs() {
-  const [bankText, dualText, exclText, pocketText] = await Promise.all([
-    fetch('./bank-positions.yaml').then(r => r.text()),
-    fetch('./dual-positions.yaml').then(r => r.text()),
-    fetch('./excluded-positions.yaml').then(r => r.text()),
-    fetch('./pocket-targets.yaml').then(r => r.text()),
-  ]);
-  BANK_POSITIONS = parsePositionYaml(bankText);
-  DUAL_POSITIONS = parsePositionYaml(dualText);
-  EXCLUDED_POSITIONS = parsePositionYaml(exclText);
-  POCKET_TARGETS = parsePocketYaml(pocketText);
+  try {
+    const [bankText, dualText, exclText, pocketText] = await Promise.all([
+      fetch('./bank-positions.yaml').then(r => r.ok ? r.text() : ''),
+      fetch('./dual-positions.yaml').then(r => r.ok ? r.text() : ''),
+      fetch('./excluded-positions.yaml').then(r => r.ok ? r.text() : ''),
+      fetch('./pocket-targets.yaml').then(r => r.ok ? r.text() : ''),
+    ]);
+    BANK_POSITIONS = parsePositionYaml(bankText);
+    DUAL_POSITIONS = parsePositionYaml(dualText);
+    EXCLUDED_POSITIONS = parsePositionYaml(exclText);
+    POCKET_TARGETS = parsePocketYaml(pocketText);
+  } catch (e) {
+    console.warn('Failed to load position configs:', e);
+  }
 }
 
 function getShotType(ballNum, posKey) {
@@ -512,7 +516,7 @@ function renderTableDiagram() {
     else if (hasData) markerFill = '#6ee7a0';
     else markerFill = 'rgba(255,255,255,0.25)';
 
-    svg += `<circle cx="${x}" cy="${y}" r="${isSelected ? 11 : 8}" fill="${markerFill}" stroke="${isSelected ? '#fff' : 'none'}" stroke-width="${isSelected ? 2 : 0}" data-cue="${key}" class="cue-marker" style="cursor:pointer"/>`;
+    svg += `<circle cx="${x}" cy="${y}" r="${isSelected ? 13 : 10}" fill="${markerFill}" stroke="${isSelected ? '#fff' : 'none'}" stroke-width="${isSelected ? 2 : 0}" data-cue="${key}" class="cue-marker" style="cursor:pointer"/>`;
 
     // Note indicator
     const hasNote = isDual
