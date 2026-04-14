@@ -1,0 +1,23 @@
+# Pocket targets: which pocket each ball is aimed at.
+# One entry per line:  ballNumber: PocketID
+#
+# Pocket IDs (matching the 6 table pockets):
+#   BL = Bottom-Left corner   (grid 0, 0)
+#   TL = Top-Left corner      (grid 0, 4)
+#   BS = Bottom-Side pocket   (grid 4, 0)
+#   TS = Top-Side pocket      (grid 4, 4)
+#   BR = Bottom-Right corner  (grid 8, 0)
+#   TR = Top-Right corner     (grid 8, 4)
+
+1: BL
+2: BL
+3: TL
+4: BL
+5: BS
+6: TL
+7: BS
+8: BS
+9: TS
+10: BS
+11: BS
+12: TS

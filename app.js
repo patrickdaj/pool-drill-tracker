@@ -55,10 +55,23 @@ let DUAL_POSITIONS = {};
     Everything else is cut. Loaded from bank-positions.yaml */
 let BANK_POSITIONS = {};
 
+/** Pocket target per ball — loaded from pocket-targets.yaml */
+let POCKET_TARGETS = {};
+
+/** The 6 pocket positions on the table grid. */
+const POCKET_COORDS = {
+  BL: { col: 0, row: 0 },
+  TL: { col: 0, row: 4 },
+  BS: { col: 4, row: 0 },
+  TS: { col: 4, row: 4 },
+  BR: { col: 8, row: 0 },
+  TR: { col: 8, row: 4 },
+};
+
 /**
- * Parse a simple YAML config file of the form:
+ * Parse a YAML config file of the form:
  *   ballNumber: ["col,row", ...]
- * Returns { ballNumber: Set([...]), ... }
+ * Duplicate ball keys are merged into one Set.
  */
 function parsePositionYaml(text) {
   const result = {};
@@ -69,20 +82,38 @@ function parsePositionYaml(text) {
     if (!m) continue;
     const ball = parseInt(m[1], 10);
     const items = m[2].match(/"([^"]+)"/g);
-    result[ball] = new Set(items ? items.map(s => s.replace(/"/g, '')) : []);
+    if (!result[ball]) result[ball] = new Set();
+    if (items) items.forEach(s => result[ball].add(s.replace(/"/g, '')));
+  }
+  return result;
+}
+
+/**
+ * Parse pocket-targets.yaml:  ballNumber: PocketID
+ */
+function parsePocketYaml(text) {
+  const result = {};
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const m = trimmed.match(/^(\d+):\s*(\w+)$/);
+    if (!m) continue;
+    result[parseInt(m[1], 10)] = m[2];
   }
   return result;
 }
 
 async function loadPositionConfigs() {
-  const [bankText, dualText, exclText] = await Promise.all([
+  const [bankText, dualText, exclText, pocketText] = await Promise.all([
     fetch('./bank-positions.yaml').then(r => r.text()),
     fetch('./dual-positions.yaml').then(r => r.text()),
     fetch('./excluded-positions.yaml').then(r => r.text()),
+    fetch('./pocket-targets.yaml').then(r => r.text()),
   ]);
   BANK_POSITIONS = parsePositionYaml(bankText);
   DUAL_POSITIONS = parsePositionYaml(dualText);
   EXCLUDED_POSITIONS = parsePositionYaml(exclText);
+  POCKET_TARGETS = parsePocketYaml(pocketText);
 }
 
 function getShotType(ballNum, posKey) {
@@ -92,6 +123,37 @@ function getShotType(ballNum, posKey) {
 
 function isDualPosition(ballNum, posKey) {
   return DUAL_POSITIONS[ballNum] && DUAL_POSITIONS[ballNum].has(posKey);
+}
+
+/** Cut angle in degrees between CB→OB aim line and OB→Pocket target line. */
+function getCutAngle(ballNum, posKey) {
+  const bp = BALL_POSITIONS[ballNum];
+  const parts = posKey.replace(/:.*/, '').split(',');
+  const cc = parseInt(parts[0], 10), cr = parseInt(parts[1], 10);
+  const pk = POCKET_COORDS[POCKET_TARGETS[ballNum]];
+  if (!pk) return null;
+  const tx = pk.col - bp.col, ty = pk.row - bp.row;
+  const ax = bp.col - cc, ay = bp.row - cr;
+  const tLen = Math.sqrt(tx * tx + ty * ty);
+  const aLen = Math.sqrt(ax * ax + ay * ay);
+  if (tLen === 0 || aLen === 0) return 0;
+  const cosA = Math.max(-1, Math.min(1, (tx * ax + ty * ay) / (tLen * aLen)));
+  return Math.acos(cosA) * 180 / Math.PI;
+}
+
+/** Returns 'left', 'right', or 'straight' based on which side of the
+ *  OB→Pocket line the cue ball is on. */
+function getCutDirection(ballNum, posKey) {
+  const bp = BALL_POSITIONS[ballNum];
+  const parts = posKey.replace(/:.*/, '').split(',');
+  const cc = parseInt(parts[0], 10), cr = parseInt(parts[1], 10);
+  const pk = POCKET_COORDS[POCKET_TARGETS[ballNum]];
+  if (!pk) return null;
+  const tx = pk.col - bp.col, ty = pk.row - bp.row;
+  const ax = bp.col - cc, ay = bp.row - cr;
+  const cross = ax * ty - ay * tx;
+  if (Math.abs(cross) < 0.001) return 'straight';
+  return cross > 0 ? 'left' : 'right';
 }
 
 function isPositionComplete(ballNum, posKey) {

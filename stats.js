@@ -39,6 +39,8 @@ function computeStats(session) {
   const byType = { cut: { sum: 0, count: 0 }, bank: { sum: 0, count: 0 } };
   const byDist = { short: { sum: 0, count: 0 }, mid: { sum: 0, count: 0 }, long: { sum: 0, count: 0 } };
   const byRail = {};
+  const byAngle = { full: { sum: 0, count: 0 }, three_q: { sum: 0, count: 0 }, half: { sum: 0, count: 0 }, quarter: { sum: 0, count: 0 }, thin: { sum: 0, count: 0 }, back: { sum: 0, count: 0 } };
+  const byCutDir = { left: { sum: 0, count: 0 }, right: { sum: 0, count: 0 }, straight: { sum: 0, count: 0 } };
   const allPositions = [];
 
   for (let b = 1; b <= 12; b++) {
@@ -55,6 +57,14 @@ function computeStats(session) {
       vals.push({ key: k, attempts: a, type, pct, dist, rail, note: e.note || '' });
 
       if (byType[type]) { byType[type].sum += a; byType[type].count++; }
+
+      const angle = getCutAngle(b, k);
+      const dir = getCutDirection(b, k);
+      if (angle !== null) {
+        const aBucket = angle >= 90 ? 'back' : angle >= 70 ? 'thin' : angle >= 50 ? 'quarter' : angle >= 30 ? 'half' : angle >= 15 ? 'three_q' : 'full';
+        byAngle[aBucket].sum += a; byAngle[aBucket].count++;
+      }
+      if (dir && byCutDir[dir]) { byCutDir[dir].sum += a; byCutDir[dir].count++; }
 
       const bucket = dist <= 1.5 ? 'short' : dist <= 3.5 ? 'mid' : 'long';
       byDist[bucket].sum += a;
@@ -92,7 +102,7 @@ function computeStats(session) {
     balls, totalAttempts, totalSlots,
     sessionAvg, sessionPct,
     best, worst, bestPos, worstPos,
-    byType, byDist, byRail, allPositions,
+    byType, byDist, byRail, byAngle, byCutDir, allPositions,
   };
 }
 
@@ -124,6 +134,35 @@ function renderStats() {
     <div class="stats-item"><div class="stats-item-value value-bank">${bankPct.toFixed(0)}%</div><div class="stats-item-label">Bank Rate (${s.byType.bank.count})</div></div>
     <div class="stats-item"><div class="stats-item-value">${cutAvg.toFixed(1)} / ${bankAvg.toFixed(1)}</div><div class="stats-item-label">Cut / Bank Avg</div></div>
   `;
+
+  // By cut angle
+  const ag = document.getElementById('stats-angle-grid');
+  if (ag) {
+    const angleHtml = (label, d) => {
+      const avg = d.count > 0 ? d.sum / d.count : 0;
+      const pct = avg > 0 ? hitPct(avg) : 0;
+      return `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${label} (${d.count})</div></div>`;
+    };
+    ag.innerHTML = angleHtml('Full 0-15°', s.byAngle.full)
+      + angleHtml('¾ Ball 15-30°', s.byAngle.three_q)
+      + angleHtml('½ Ball 30-50°', s.byAngle.half)
+      + angleHtml('¼ Ball 50-70°', s.byAngle.quarter)
+      + angleHtml('Thin 70-90°', s.byAngle.thin)
+      + angleHtml('Backcut 90°+', s.byAngle.back);
+  }
+
+  // By cut direction
+  const cg = document.getElementById('stats-cutdir-grid');
+  if (cg) {
+    const dirHtml = (label, d) => {
+      const avg = d.count > 0 ? d.sum / d.count : 0;
+      const pct = avg > 0 ? hitPct(avg) : 0;
+      return `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${label} (${d.count})</div></div>`;
+    };
+    cg.innerHTML = dirHtml('Cut Left', s.byCutDir.left)
+      + dirHtml('Cut Right', s.byCutDir.right)
+      + dirHtml('Straight', s.byCutDir.straight);
+  }
 
   // By distance
   const dg = document.getElementById('stats-distance-grid');
@@ -166,10 +205,15 @@ function renderStats() {
       for (const p of sorted) {
         const label = getPosLabel(b, p.key.replace(/:.*/, ''));
         const pctVal = p.pct;
+        const ang = getCutAngle(b, p.key);
+        const dir = getCutDirection(b, p.key);
+        const angStr = ang !== null ? Math.round(ang) + '°' : '';
+        const dirStr = dir === 'left' ? 'L' : dir === 'right' ? 'R' : dir === 'straight' ? '—' : '';
         ballHtml += `<div class="stats-pos-row">
           <span class="stats-pos-key">${p.key}</span>
           <span class="stats-pos-label">${label}</span>
           <span class="stats-pos-type type-${p.type}">${p.type}</span>
+          <span class="stats-pos-angle">${angStr}${dirStr ? ' ' + dirStr : ''}</span>
           <span class="stats-pos-attempts">${p.attempts}</span>
           <span class="stats-pos-pct ${pctClass(pctVal)}">${pctVal.toFixed(0)}%</span>
         </div>`;

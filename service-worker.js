@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pool-drill-v16';
+const CACHE_NAME = 'pool-drill-v17';
 const ASSETS = [
   './',
   './index.html',
@@ -12,7 +12,8 @@ const ASSETS = [
   './icon-512.svg',
   './bank-positions.yaml',
   './dual-positions.yaml',
-  './excluded-positions.yaml'
+  './excluded-positions.yaml',
+  './pocket-targets.yaml'
 ];
 
 self.addEventListener('install', (e) => {
