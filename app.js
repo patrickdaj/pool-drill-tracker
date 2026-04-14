@@ -629,6 +629,34 @@ function renderTableDiagram() {
 
 // ── UI Rendering ────────────────────────────────────
 
+function angleName(deg) {
+  if (deg >= 90) return 'Backcut';
+  if (deg >= 70) return 'Thin';
+  if (deg >= 50) return '¼ Ball';
+  if (deg >= 30) return '½ Ball';
+  if (deg >= 15) return '¾ Ball';
+  return 'Full';
+}
+
+function renderShotInfo() {
+  const el = document.getElementById('shot-info');
+  if (!el) return;
+  const b = state.selectedBall;
+  const pk = state.selectedPosition;
+  if (!pk) { el.textContent = ''; return; }
+  const type = getShotType(b, pk);
+  if (type === 'bank') {
+    el.innerHTML = '<span class="shot-info-bank">Bank Shot</span>';
+    return;
+  }
+  const angle = getCutAngle(b, pk);
+  const dir = getCutDirection(b, pk);
+  if (angle === null) { el.textContent = ''; return; }
+  const dirLabel = dir === 'left' ? 'Left' : dir === 'right' ? 'Right' : 'Straight';
+  const name = angleName(angle);
+  el.innerHTML = `<span class="shot-info-dir">${dirLabel}</span> <span class="shot-info-name">${name}</span> <span class="shot-info-deg">${Math.round(angle)}°</span>`;
+}
+
 function renderBallSelector() {
   const row = document.getElementById('ball-row');
   row.innerHTML = '';
@@ -751,6 +779,7 @@ function renderAll() {
   renderTotals();
   renderSessionSelector();
   renderTableDiagram();
+  renderShotInfo();
 }
 
 // ── Actions ─────────────────────────────────────────
@@ -780,6 +809,7 @@ function selectPosition(key) {
   renderDisplay();
   renderDirToggle();
   renderTableDiagram();
+  renderShotInfo();
 }
 
 function pressDigit(d) {

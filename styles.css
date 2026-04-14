@@ -122,6 +122,31 @@ body {
   display: block;
 }
 
+/* Shot info below table */
+.shot-info {
+  width: 100%;
+  max-width: 440px;
+  text-align: center;
+  padding: 2px 16px 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  min-height: 1.4em;
+}
+.shot-info-dir {
+  color: rgba(255,255,255,0.7);
+}
+.shot-info-name {
+  color: #6ee7a0;
+}
+.shot-info-deg {
+  color: rgba(255,255,255,0.35);
+  font-weight: 400;
+}
+.shot-info-bank {
+  color: #e8a23a;
+}
+
 /* ===== Ball Grid (6x2) ===== */
 .selector-section {
   width: 100%;
