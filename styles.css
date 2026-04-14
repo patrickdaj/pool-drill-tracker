@@ -4,6 +4,7 @@
 html {
   font-size: 16px;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 body {
@@ -359,13 +360,13 @@ body {
 }
 
 .num-digit {
-  background: rgba(255,255,255,0.06);
-  color: #e8e8ef;
+  background: rgba(110, 160, 255, 0.10);
+  color: #c8d0e8;
 }
 
 .num-backspace {
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.45);
   font-size: 1.1rem;
 }
 
@@ -394,7 +395,7 @@ body {
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 8px;
   color: rgba(255,255,255,0.7);
-  font-size: 0.7rem;
+  font-size: 16px;
   font-family: inherit;
   padding: 6px 10px;
   outline: none;
