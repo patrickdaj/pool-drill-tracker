@@ -3,6 +3,9 @@
    ===================================================== */
 
 const REQUIRED_MAKES = 2;
+const TRENDING_COUNT = 5;
+
+let statsView = 'session'; // 'session' | 'trending' | 'history'
 
 function cbDistance(ballNum, posKey) {
   const bp = BALL_POSITIONS[ballNum];
@@ -29,6 +32,51 @@ function pctClass(pct) {
   if (pct >= 80) return 'pct-good';
   if (pct >= 50) return 'pct-ok';
   return 'pct-bad';
+}
+
+/** Merge multiple sessions into one with averaged attempts per position. */
+function mergeSessionsData(sessions) {
+  const merged = { data: {} };
+  const counts = {};
+  for (const session of sessions) {
+    for (let b = 1; b <= 12; b++) {
+      const ballKey = 'ball' + b;
+      const entries = session.data[ballKey] || {};
+      for (const [k, e] of Object.entries(entries)) {
+        if (!e.attempts || e.attempts <= 0) continue;
+        if (!merged.data[ballKey]) merged.data[ballKey] = {};
+        if (!counts[ballKey]) counts[ballKey] = {};
+        if (!merged.data[ballKey][k]) {
+          merged.data[ballKey][k] = { attempts: 0, type: e.type || 'cut', note: '' };
+          counts[ballKey][k] = 0;
+        }
+        merged.data[ballKey][k].attempts += e.attempts;
+        counts[ballKey][k]++;
+      }
+    }
+  }
+  for (const ballKey of Object.keys(merged.data)) {
+    for (const k of Object.keys(merged.data[ballKey])) {
+      merged.data[ballKey][k].attempts = merged.data[ballKey][k].attempts / counts[ballKey][k];
+    }
+  }
+  return merged;
+}
+
+/** Get sessions for the current view. */
+function getViewSessions() {
+  const data = getAppData();
+  const sorted = [...data.sessions].sort((a, b) => b.id.localeCompare(a.id));
+  if (statsView === 'trending') return sorted.slice(0, TRENDING_COUNT);
+  if (statsView === 'history') return sorted;
+  return [getActiveSession()];
+}
+
+/** Get the effective data object for the current view. */
+function getViewData() {
+  const sessions = getViewSessions();
+  if (statsView === 'session') return sessions[0];
+  return mergeSessionsData(sessions);
 }
 
 function computeStats(session) {
@@ -58,13 +106,16 @@ function computeStats(session) {
 
       if (byType[type]) { byType[type].sum += a; byType[type].count++; }
 
-      const angle = getCutAngle(b, k);
-      const dir = getCutDirection(b, k);
-      if (angle !== null) {
-        const aBucket = angle >= 90 ? 'back' : angle >= 70 ? 'thin' : angle >= 50 ? 'quarter' : angle >= 30 ? 'half' : angle >= 15 ? 'three_q' : 'full';
-        byAngle[aBucket].sum += a; byAngle[aBucket].count++;
+      // Only compute cut angle/direction for non-bank shots
+      if (type !== 'bank') {
+        const angle = getCutAngle(b, k);
+        const dir = getCutDirection(b, k);
+        if (angle !== null) {
+          const aBucket = angle >= 90 ? 'back' : angle >= 70 ? 'thin' : angle >= 50 ? 'quarter' : angle >= 30 ? 'half' : angle >= 15 ? 'three_q' : 'full';
+          byAngle[aBucket].sum += a; byAngle[aBucket].count++;
+        }
+        if (dir && byCutDir[dir]) { byCutDir[dir].sum += a; byCutDir[dir].count++; }
       }
-      if (dir && byCutDir[dir]) { byCutDir[dir].sum += a; byCutDir[dir].count++; }
 
       const bucket = dist <= 1.5 ? 'short' : dist <= 3.5 ? 'mid' : 'long';
       byDist[bucket].sum += a;
@@ -108,19 +159,121 @@ function computeStats(session) {
 
 let expandedBall = null;
 
+/**
+ * Render a mini SVG table for a ball showing OB position and
+ * hit percentages at each CB position. Green=cut, orange=bank.
+ */
+function renderMiniTable(ballNum, ballStats) {
+  // Build a lookup from posKey (without direction suffix) to position data
+  const posData = {};
+  for (const p of ballStats.positions) {
+    const baseKey = p.key.replace(/:.*/, '');
+    if (!posData[baseKey]) {
+      posData[baseKey] = { attempts: 0, count: 0, type: p.type };
+    }
+    posData[baseKey].attempts += p.attempts;
+    posData[baseKey].count++;
+  }
+  // Average dual positions
+  for (const k of Object.keys(posData)) {
+    if (posData[k].count > 1) {
+      posData[k].attempts = posData[k].attempts / posData[k].count;
+    }
+  }
+
+  const margin = 8;
+  const railW = 6;
+  const sp = 30; // spacing between grid positions
+  const gridCols = 8;
+  const gridRows = 4;
+  const innerW = gridCols * sp;
+  const innerH = gridRows * sp;
+  const totalW = innerW + 2 * railW + 2 * margin;
+  const totalH = innerH + 2 * railW + 2 * margin;
+  const ox = margin + railW;
+  const oy = margin + railW + innerH;
+
+  function dx(col) { return ox + col * sp; }
+  function dy(row) { return oy - row * sp; }
+
+  let svg = `<svg class="mini-table-svg" viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Table felt
+  svg += `<rect x="${margin}" y="${margin}" width="${innerW + 2 * railW}" height="${innerH + 2 * railW}" rx="6" fill="#3e2723"/>`;
+  svg += `<rect x="${ox}" y="${margin + railW}" width="${innerW}" height="${innerH}" rx="2" fill="#2a7a35"/>`;
+  svg += `<rect x="${margin}" y="${margin}" width="${innerW + 2 * railW}" height="${innerH + 2 * railW}" rx="6" fill="none" stroke="#3e2723" stroke-width="1.5"/>`;
+
+  // CB positions
+  const cuePositions = getCuePositions(ballNum);
+  const cueKeys = new Set(cuePositions.map(coordKey));
+
+  for (const pos of PERIMETER_PATH) {
+    const key = coordKey(pos);
+    if (!cueKeys.has(key)) continue;
+    const x = dx(pos.col);
+    const y = dy(pos.row);
+    const pd = posData[key];
+
+    if (pd) {
+      const pct = hitPct(pd.attempts);
+      const isBank = pd.type === 'bank';
+      const fill = isBank ? '#e8a23a' : '#6ee7a0';
+      const fillBg = isBank ? 'rgba(232,162,58,0.2)' : 'rgba(110,231,160,0.2)';
+      svg += `<circle cx="${x}" cy="${y}" r="11" fill="${fillBg}" stroke="${fill}" stroke-width="1"/>`;
+      svg += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-size="7" font-weight="700" font-family="Inter,system-ui,sans-serif" fill="${fill}">${Math.round(pct)}%</text>`;
+    } else {
+      svg += `<circle cx="${x}" cy="${y}" r="6" fill="rgba(255,255,255,0.12)"/>`;
+    }
+  }
+
+  // Object ball
+  const bp = BALL_POSITIONS[ballNum];
+  const bx = dx(bp.col);
+  const by = dy(bp.row);
+  const bc = BALL_COLORS[ballNum];
+  const br = 9;
+  if (bc.stripe) {
+    svg += `<circle cx="${bx}" cy="${by}" r="${br}" fill="${bc.fill}"/>`;
+    svg += `<rect x="${bx - br}" y="${by - 2}" width="${br * 2}" height="4" fill="#fff" clip-path="circle(${br}px at ${bx}px ${by}px)"/>`;
+    svg += `<circle cx="${bx}" cy="${by}" r="${br}" fill="none" stroke="#fff" stroke-width="1.5"/>`;
+  } else {
+    svg += `<circle cx="${bx}" cy="${by}" r="${br}" fill="${bc.fill}" stroke="#fff" stroke-width="1.5"/>`;
+  }
+  svg += `<text x="${bx}" y="${by + 3}" text-anchor="middle" font-size="8" font-weight="700" font-family="Inter,system-ui,sans-serif" fill="${bc.text}">${ballNum}</text>`;
+
+  svg += '</svg>';
+  return svg;
+}
+
 function renderStats() {
-  const session = getActiveSession();
-  const s = computeStats(session);
+  const viewData = getViewData();
+  const s = computeStats(viewData);
+  const viewSessions = getViewSessions();
+
+  // Update view-dependent UI
+  const sessionSelect = document.getElementById('session-select');
+  const trendsSection = document.getElementById('stats-trends-section');
+  const overviewTitle = document.getElementById('stats-overview-title');
+  sessionSelect.style.display = statsView === 'session' ? '' : 'none';
+
+  if (statsView === 'trending') {
+    overviewTitle.textContent = `Trending — Last ${viewSessions.length} Sessions`;
+  } else if (statsView === 'history') {
+    overviewTitle.textContent = `History — ${viewSessions.length} Sessions`;
+  } else {
+    overviewTitle.textContent = 'Session Overview';
+  }
 
   // Session overview
   const sg = document.getElementById('stats-session-grid');
+  const isMulti = statsView !== 'session';
   sg.innerHTML = `
     <div class="stats-item"><div class="stats-item-value">${s.sessionPct.toFixed(0)}%</div><div class="stats-item-label">Hit Rate</div></div>
     <div class="stats-item"><div class="stats-item-value">${s.sessionAvg.toFixed(1)}</div><div class="stats-item-label">Avg Attempts</div></div>
-    <div class="stats-item"><div class="stats-item-value">${s.totalSlots}/${getTotalPositionCount()}</div><div class="stats-item-label">Filled</div></div>
+    <div class="stats-item"><div class="stats-item-value">${s.totalSlots}/${getTotalPositionCount()}</div><div class="stats-item-label">${isMulti ? 'Positions Seen' : 'Filled'}</div></div>
     <div class="stats-item"><div class="stats-item-value">${s.best ? s.best.ball : '-'}</div><div class="stats-item-label">Best Ball (${s.best ? s.best.avg.toFixed(1) : '-'})</div></div>
     <div class="stats-item"><div class="stats-item-value">${s.worst ? s.worst.ball : '-'}</div><div class="stats-item-label">Worst Ball (${s.worst ? s.worst.avg.toFixed(1) : '-'})</div></div>
-    <div class="stats-item"><div class="stats-item-value">${s.totalAttempts}</div><div class="stats-item-label">Total Attempts</div></div>
+    <div class="stats-item"><div class="stats-item-value">${isMulti ? viewSessions.length : s.totalAttempts}</div><div class="stats-item-label">${isMulti ? 'Sessions' : 'Total Attempts'}</div></div>
   `;
 
   // By shot type
@@ -184,7 +337,7 @@ function renderStats() {
   }
   rg.innerHTML = railHtml;
 
-  // Per-ball breakdown with expandable detail
+  // Per-ball breakdown with mini table
   const bl = document.getElementById('stats-ball-list');
   let ballHtml = '';
   for (let b = 1; b <= 12; b++) {
@@ -192,33 +345,17 @@ function renderStats() {
     const posCount = getCuePositions(b).length;
     const pct = posCount > 0 ? Math.round((bs.filled / posCount) * 100) : 0;
     const isExpanded = expandedBall === b;
+    const pocketId = POCKET_TARGETS[b] || '?';
     ballHtml += `<div class="stats-ball-row" data-stats-ball="${b}">
       <span class="stats-ball-num">B${b}</span>
+      <span class="stats-ball-pocket">${pocketId}</span>
       <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${pct}%"></div></div>
       <span class="stats-ball-avg">${bs.filled > 0 ? bs.avg.toFixed(1) : '-'}</span>
       <span class="stats-ball-pct">${bs.filled > 0 ? bs.avgPct.toFixed(0) + '%' : '-'}</span>
       <span class="stats-ball-count">${bs.filled}/${posCount}</span>
     </div>`;
-    if (isExpanded && bs.positions.length > 0) {
-      ballHtml += '<div class="stats-ball-detail">';
-      const sorted = [...bs.positions].sort((a, b) => a.key.localeCompare(b.key));
-      for (const p of sorted) {
-        const label = getPosLabel(b, p.key.replace(/:.*/, ''));
-        const pctVal = p.pct;
-        const ang = getCutAngle(b, p.key);
-        const dir = getCutDirection(b, p.key);
-        const angStr = ang !== null ? Math.round(ang) + '°' : '';
-        const dirStr = dir === 'left' ? 'L' : dir === 'right' ? 'R' : dir === 'straight' ? '—' : '';
-        ballHtml += `<div class="stats-pos-row">
-          <span class="stats-pos-key">${p.key}</span>
-          <span class="stats-pos-label">${label}</span>
-          <span class="stats-pos-type type-${p.type}">${p.type}</span>
-          <span class="stats-pos-angle">${angStr}${dirStr ? ' ' + dirStr : ''}</span>
-          <span class="stats-pos-attempts">${p.attempts}</span>
-          <span class="stats-pos-pct ${pctClass(pctVal)}">${pctVal.toFixed(0)}%</span>
-        </div>`;
-      }
-      ballHtml += '</div>';
+    if (isExpanded) {
+      ballHtml += `<div class="stats-ball-detail">${renderMiniTable(b, bs)}</div>`;
     }
   }
   bl.innerHTML = ballHtml;
@@ -232,12 +369,12 @@ function renderStats() {
     });
   });
 
-  // Trends vs previous session
+  // Trends vs previous session (only in session view)
   const data = getAppData();
   const sorted = [...data.sessions].sort((a, b) => b.id.localeCompare(a.id));
+  const session = getActiveSession();
   const currentIdx = sorted.findIndex((ses) => ses.id === session.id);
-  const trendsSection = document.getElementById('stats-trends-section');
-  if (currentIdx >= 0 && currentIdx < sorted.length - 1) {
+  if (statsView === 'session' && currentIdx >= 0 && currentIdx < sorted.length - 1) {
     const prev = sorted[currentIdx + 1];
     const ps = computeStats(prev);
     trendsSection.style.display = '';
@@ -288,6 +425,15 @@ function initStats() {
 
   document.getElementById('session-select').addEventListener('change', (e) => {
     switchSession(e.target.value);
+  });
+
+  // View tab switching
+  document.querySelectorAll('.stats-view-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      statsView = tab.dataset.view;
+      document.querySelectorAll('.stats-view-tab').forEach((t) => t.classList.toggle('active', t.dataset.view === statsView));
+      renderStats();
+    });
   });
 }
 

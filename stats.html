@@ -29,8 +29,15 @@
 
   <!-- Stats Content -->
   <div class="stats-page">
+    <!-- View Switcher -->
+    <div class="stats-view-tabs">
+      <button class="stats-view-tab active" data-view="session">Session</button>
+      <button class="stats-view-tab" data-view="trending">Trending</button>
+      <button class="stats-view-tab" data-view="history">History</button>
+    </div>
+
     <div class="stats-section">
-      <div class="stats-section-title">Session Overview</div>
+      <div class="stats-section-title" id="stats-overview-title">Session Overview</div>
       <div class="stats-grid" id="stats-session-grid"></div>
     </div>
     <div class="stats-section">

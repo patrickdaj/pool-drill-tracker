@@ -1,5 +1,33 @@
 /* ===== Stats Page ===== */
 
+/* View Tabs */
+.stats-view-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 3px;
+}
+.stats-view-tab {
+  flex: 1;
+  padding: 7px 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(255,255,255,0.4);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.stats-view-tab.active {
+  background: rgba(110,231,160,0.15);
+  color: #6ee7a0;
+}
+
 .back-link {
   color: #6ee7a0;
   text-decoration: none;
@@ -124,6 +152,14 @@
   text-align: right;
 }
 
+.stats-ball-pocket {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: rgba(110,231,160,0.5);
+  width: 20px;
+  text-align: center;
+}
+
 .stats-bar-track {
   flex: 1;
   height: 10px;
@@ -166,8 +202,16 @@
 
 /* Expanded per-ball position detail */
 .stats-ball-detail {
-  padding: 4px 8px 8px 40px;
+  padding: 4px 0 8px;
   margin-bottom: 4px;
+  display: flex;
+  justify-content: center;
+}
+
+.mini-table-svg {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
 }
 
 .stats-pos-row {

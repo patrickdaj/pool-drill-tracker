@@ -448,6 +448,17 @@ function renderTableDiagram() {
     svg += `<circle cx="${dx(c)}" cy="${dy(r)}" r="${pocketR - 2}" fill="none" stroke="#1a1a1a" stroke-width="1"/>`;
   }
 
+  // Highlight the target pocket for the selected ball
+  const targetPocketId = POCKET_TARGETS[state.selectedBall];
+  const targetPocket = POCKET_COORDS[targetPocketId];
+  if (targetPocket) {
+    const bp = BALL_POSITIONS[state.selectedBall];
+    // Dashed aim line from OB to target pocket
+    svg += `<line x1="${dx(bp.col)}" y1="${dy(bp.row)}" x2="${dx(targetPocket.col)}" y2="${dy(targetPocket.row)}" stroke="rgba(110,231,160,0.25)" stroke-width="1" stroke-dasharray="3,3"/>`;
+    svg += `<circle cx="${dx(targetPocket.col)}" cy="${dy(targetPocket.row)}" r="${pocketR + 4}" fill="none" stroke="#6ee7a0" stroke-width="2" stroke-opacity="0.7"/>`;
+    svg += `<text x="${dx(targetPocket.col)}" y="${dy(targetPocket.row) - pocketR - 4}" text-anchor="middle" font-size="7" font-weight="600" font-family="Inter,system-ui,sans-serif" fill="rgba(110,231,160,0.7)" style="pointer-events:none">${targetPocketId}</text>`;
+  }
+
   // Drill zone boundary (between drill col 6 and col 7, i.e. grid col 6.5)
   const zoneX = dx(6) + dSpaceX / 2;
   svg += `<line x1="${zoneX}" y1="${margin + railW + 2}" x2="${zoneX}" y2="${margin + railW + innerH - 2}" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4,4"/>`;
