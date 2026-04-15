@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pool-drill-v36';
+const CACHE_NAME = 'pool-drill-v37';
 const ASSETS = [
   './',
   './index.html',

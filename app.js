@@ -274,7 +274,7 @@ const DRILL_TYPES = {
 // ── Mighty X Constants ──────────────────────────────
 
 const MX_SIDES = ['left', 'right'];
-const MX_LEVELS = [1, 2, 3];
+const MX_LEVELS = [1, 2];
 const MX_SHOTS = ['follow', 'draw', 'stop'];
 const MX_SHOT_COLORS = { follow: '#6ee7a0', draw: '#e8a23a', stop: '#7aa2f7' };
 const MX_SHOT_LABELS = { follow: 'Follow', draw: 'Draw', stop: 'Stop' };
@@ -1459,40 +1459,48 @@ function renderMxTableSvg() {
     if (!pocketSet.has('8,' + r)) svg += `<circle cx="${margin + 2 * railW + innerW - 4}" cy="${dy(r)}" r="2" fill="#8d6e63"/>`;
   }
 
-  // X diagonal lines
-  svg += `<line x1="${dx(0.3)}" y1="${dy(0.15)}" x2="${dx(7.7)}" y2="${dy(3.85)}" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" stroke-dasharray="6,4"/>`;
-  svg += `<line x1="${dx(0.3)}" y1="${dy(3.85)}" x2="${dx(7.7)}" y2="${dy(0.15)}" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" stroke-dasharray="6,4"/>`;
+  // X diagonal lines — highlight the active diagonal
+  const isLeft = state.mxSide === 'left';
+  // BL↔TR diagonal = "left" side
+  svg += `<line x1="${dx(0.3)}" y1="${dy(0.15)}" x2="${dx(7.7)}" y2="${dy(3.85)}" stroke="rgba(255,255,255,${isLeft ? '0.15' : '0.05'})" stroke-width="${isLeft ? '2' : '1.5'}" stroke-dasharray="6,4"/>`;
+  // TL↔BR diagonal = "right" side
+  svg += `<line x1="${dx(0.3)}" y1="${dy(3.85)}" x2="${dx(7.7)}" y2="${dy(0.15)}" stroke="rgba(255,255,255,${!isLeft ? '0.15' : '0.05'})" stroke-width="${!isLeft ? '2' : '1.5'}" stroke-dasharray="6,4"/>`;
 
   // Center OB — bright red ball
   svg += `<circle cx="${dx(4)}" cy="${dy(2)}" r="8" fill="#e53935" stroke="#b71c1c" stroke-width="1.5"/>`;
   svg += `<ellipse cx="${dx(4) - 2}" cy="${dy(2) - 2}" rx="3" ry="2" fill="rgba(255,255,255,0.3)" transform="rotate(-30 ${dx(4) - 2} ${dy(2) - 2})"/>`;
 
-  // CB positions along X arms — 3 levels aligned with diamonds (cols 1,2,3 / 5,6,7)
+  // CB positions — 2 levels per arm, aligned with diamonds
   const arms = { 'left-upper': [], 'left-lower': [], 'right-upper': [], 'right-lower': [] };
-  for (let i = 0; i < 3; i++) {
-    const t = (i + 1) / 4; // t = 0.25, 0.5, 0.75 → cols 1,2,3 or 5,6,7
+  for (let i = 0; i < 2; i++) {
+    const t = (i + 1) / 4; // t = 0.25, 0.5
     arms['left-upper'].push({ col: 4 - t * 4, row: 2 + t * 2 });
     arms['left-lower'].push({ col: 4 - t * 4, row: 2 - t * 2 });
     arms['right-upper'].push({ col: 4 + t * 4, row: 2 + t * 2 });
     arms['right-lower'].push({ col: 4 + t * 4, row: 2 - t * 2 });
   }
 
-  // Only show the current side's CB positions
+  // Diagonal pairing:
+  // "left"  = BL↔TR diagonal: left-lower arm + right-upper arm
+  // "right" = TL↔BR diagonal: left-upper arm + right-lower arm
   const side = state.mxSide;
-  const upperArm = arms[side + '-upper'];
-  const lowerArm = arms[side + '-lower'];
+  const activeArms = side === 'left'
+    ? [arms['right-upper'], arms['left-lower']]
+    : [arms['left-upper'], arms['right-lower']];
+  const inactiveArms = side === 'left'
+    ? [arms['left-upper'], arms['right-lower']]
+    : [arms['right-upper'], arms['left-lower']];
 
-  // Dimmed markers for the other side
-  const otherSide = side === 'left' ? 'right' : 'left';
-  for (const arm of [arms[otherSide + '-upper'], arms[otherSide + '-lower']]) {
-    for (let li = 0; li < 3; li++) {
+  // Dimmed markers for inactive diagonal
+  for (const arm of inactiveArms) {
+    for (let li = 0; li < 2; li++) {
       const pos = arm[li];
       svg += `<circle cx="${dx(pos.col)}" cy="${dy(pos.row)}" r="4" fill="rgba(255,255,255,0.06)"/>`;
     }
   }
 
-  // Current side markers
-  for (let li = 0; li < 3; li++) {
+  // Active diagonal markers
+  for (let li = 0; li < 2; li++) {
     const level = li + 1;
     let doneCount = 0;
     for (const shot of MX_SHOTS) {
@@ -1501,11 +1509,10 @@ function renderMxTableSvg() {
     const isCurrent = level === state.mxLevel;
     const fill = doneCount === 3 ? '#6ee7a0' : doneCount > 0 ? 'rgba(110,231,160,0.4)' : 'rgba(255,255,255,0.15)';
 
-    for (const arm of [upperArm, lowerArm]) {
+    for (const arm of activeArms) {
       const pos = arm[li];
       const x = dx(pos.col), y = dy(pos.row);
       if (isCurrent) {
-        // Current CB — white ball with highlight
         svg += `<circle cx="${x}" cy="${y}" r="10" fill="#f5f5f5" stroke="#fff" stroke-width="2"/>`;
         svg += `<ellipse cx="${x - 2}" cy="${y - 2}" rx="3" ry="2" fill="rgba(255,255,255,0.6)" transform="rotate(-30 ${x - 2} ${y - 2})"/>`;
         svg += `<text x="${x}" y="${y + 3.5}" text-anchor="middle" font-size="8" font-weight="700" fill="#333" style="pointer-events:none">▶</text>`;
@@ -1517,8 +1524,8 @@ function renderMxTableSvg() {
       }
     }
 
-    // Level label on upper arm
-    const uPos = upperArm[li];
+    // Level label on first (upper) arm
+    const uPos = activeArms[0][li];
     svg += `<text x="${dx(uPos.col)}" y="${dy(uPos.row) - (isCurrent ? 14 : 10)}" text-anchor="middle" font-size="6" font-weight="600" fill="rgba(255,255,255,0.3)" style="pointer-events:none">L${level}</text>`;
   }
 
@@ -1540,7 +1547,7 @@ function renderMightyX() {
   html += `<div class="table-container">${renderMxTableSvg()}</div>`;
   // Current entry info
   html += `<div class="drill-info">`;
-  html += `<span style="color:${state.mxSide === 'left' ? '#7aa2f7' : '#e8a23a'}">${state.mxSide === 'left' ? '← Left' : 'Right →'}</span>`;
+  html += `<span style="color:${state.mxSide === 'left' ? '#7aa2f7' : '#e8a23a'}">${state.mxSide === 'left' ? '↗ Left' : '↖ Right'}</span>`;
   html += ` · Level ${state.mxLevel} · `;
   html += `<span style="color:${MX_SHOT_COLORS[state.mxShot]}">${MX_SHOT_LABELS[state.mxShot]}</span>`;
   html += `</div>`;
@@ -1549,10 +1556,10 @@ function renderMightyX() {
   // Right: Controls
   html += `<div class="drill-right">`;
 
-  // Side selector
-  html += `<div class="drill-selector"><div class="selector-label">Side</div><div class="drill-toggle">`;
+  // Diagonal selector
+  html += `<div class="drill-selector"><div class="selector-label">Diagonal</div><div class="drill-toggle">`;
   for (const side of MX_SIDES) {
-    html += `<button class="drill-toggle-btn ${side === state.mxSide ? 'active' : ''}" data-mx-side="${side}">${side === 'left' ? '← Left' : 'Right →'}</button>`;
+    html += `<button class="drill-toggle-btn ${side === state.mxSide ? 'active' : ''}" data-mx-side="${side}">${side === 'left' ? '↗ Left' : '↖ Right'}</button>`;
   }
   html += `</div></div>`;
 

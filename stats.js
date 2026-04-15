@@ -465,8 +465,8 @@ function renderMxStats() {
     const pct = avg > 0 ? hitPct(avg) : 0;
     return `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${label} (${d.count})</div></div>`;
   };
-  tg.innerHTML = sideHtml('← Left', s.bySide.left) + sideHtml('Right →', s.bySide.right);
-  tg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'By Side';
+  tg.innerHTML = sideHtml('↗ Left', s.bySide.left) + sideHtml('↖ Right', s.bySide.right);
+  tg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'By Diagonal';
 
   // By Shot Type → use angle grid
   const ag = document.getElementById('stats-angle-grid');
