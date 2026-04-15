@@ -27,14 +27,14 @@ body {
 .header {
   width: 100%;
   max-width: 440px;
-  padding: 10px 16px 4px;
+  padding: 6px 16px 2px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .header h1 {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.02em;
@@ -75,7 +75,7 @@ body {
   max-width: 440px;
   display: flex;
   gap: 4px;
-  padding: 6px 16px 4px;
+  padding: 4px 16px 2px;
   background: rgba(255,255,255,0.02);
 }
 
@@ -285,15 +285,15 @@ body {
 .attempt-display {
   flex: 1;
   text-align: center;
-  font-size: 2.8rem;
+  font-size: 2.2rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #fff;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 14px;
-  padding: 4px 12px;
-  min-height: 56px;
+  padding: 2px 10px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -425,14 +425,14 @@ body {
 .numpad {
   width: 100%;
   max-width: 440px;
-  padding: 4px 16px;
+  padding: 2px 16px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  gap: 3px;
 }
 
 .numpad-btn {
-  height: 36px;
+  height: 30px;
   border: none;
   border-radius: 12px;
   font-size: 1.25rem;
@@ -750,15 +750,22 @@ body {
 .drill-left .table-container {
   width: 100%;
   max-width: 440px;
-  padding: 4px 12px;
+  padding: 2px 12px;
+}
+
+.drill-left .table-container .table-svg {
+  max-height: 180px;
+  width: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 .drill-info {
   width: 100%;
   max-width: 440px;
   text-align: center;
-  padding: 2px 16px 4px;
-  font-size: 0.78rem;
+  padding: 0px 16px 2px;
+  font-size: 0.72rem;
   font-weight: 600;
   color: rgba(255,255,255,0.5);
   min-height: 1.4em;
@@ -771,7 +778,7 @@ body {
 .drill-selector {
   width: 100%;
   max-width: 440px;
-  padding: 4px 16px;
+  padding: 2px 16px;
 }
 
 .drill-toggle {
@@ -781,8 +788,8 @@ body {
 
 .drill-toggle-btn {
   flex: 1;
-  padding: 7px 4px;
-  font-size: 0.7rem;
+  padding: 5px 4px;
+  font-size: 0.68rem;
   font-weight: 600;
   text-align: center;
   color: rgba(255,255,255,0.35);
@@ -845,8 +852,8 @@ body {
 }
 
 .wagon-spoke-btn {
-  height: 32px;
-  border-radius: 8px;
+  height: 26px;
+  border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.06);
   background: rgba(255,255,255,0.04);
   color: rgba(255,255,255,0.4);
@@ -1060,6 +1067,10 @@ body {
   .drill-left .table-container {
     max-width: none;
     padding: 4px 0;
+  }
+
+  .drill-left .table-container .table-svg {
+    max-height: none;
   }
 
   .drill-left .drill-info {

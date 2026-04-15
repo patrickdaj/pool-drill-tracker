@@ -1788,8 +1788,8 @@ function renderWagonWheel() {
   // Right: Controls
   html += `<div class="drill-right">`;
 
-  // Position selector grid (4 cols for 24 positions)
-  html += `<div class="drill-selector"><div class="selector-label">Position</div><div class="wagon-spoke-grid" style="grid-template-columns: repeat(6, 1fr)">`;
+  // Position selector grid (8 cols for 23 positions)
+  html += `<div class="drill-selector"><div class="selector-label">Position</div><div class="wagon-spoke-grid" style="grid-template-columns: repeat(8, 1fr)">`;
   for (let i = 0; i < WW_TOTAL; i++) {
     const complete = isWagonSpokeComplete(i);
     html += `<button class="wagon-spoke-btn ${i === state.wagonSpoke ? 'selected' : ''} ${complete ? 'done' : ''}" data-spoke="${i}">${complete ? '✓' : i + 1}</button>`;
