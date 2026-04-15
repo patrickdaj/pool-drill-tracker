@@ -271,6 +271,35 @@ const DRILL_TYPES = {
   wagon:     { label: 'Wagon Wheel', icon: '☸️' },
 };
 
+// ── Mighty X Constants ──────────────────────────────
+
+const MX_SIDES = ['left', 'right'];
+const MX_LEVELS = [1, 2, 3, 4];
+const MX_SHOTS = ['follow', 'draw', 'stop'];
+const MX_SHOT_COLORS = { follow: '#6ee7a0', draw: '#e8a23a', stop: '#7aa2f7' };
+const MX_SHOT_LABELS = { follow: 'Follow', draw: 'Draw', stop: 'Stop' };
+
+function mxKey(side, level, shot) { return `${side}-${level}-${shot}`; }
+
+// ── Wagon Wheel Constants ───────────────────────────
+
+const WAGON_SPOKES = [
+  { col: 1, row: 4, label: 'Top 1' },
+  { col: 3, row: 4, label: 'Top 3' },
+  { col: 5, row: 4, label: 'Top 5' },
+  { col: 7, row: 4, label: 'Top 7' },
+  { col: 8, row: 3, label: 'Rt ↑' },
+  { col: 8, row: 1, label: 'Rt ↓' },
+  { col: 7, row: 0, label: 'Bot 7' },
+  { col: 5, row: 0, label: 'Bot 5' },
+  { col: 3, row: 0, label: 'Bot 3' },
+  { col: 0, row: 1, label: 'Lt ↓' },
+  { col: 0, row: 3, label: 'Lt ↑' },
+  { col: 4, row: 0, label: 'Side Pkt' },
+];
+
+function wagonKey(spokeIdx) { return `spoke-${spokeIdx + 1}`; }
+
 // ── State ───────────────────────────────────────────
 
 const state = {
@@ -281,6 +310,13 @@ const state = {
   freshInput: true,           // true = first digit replaces default
   shotType: 'cut',
   direction: 'L',            // 'L' or 'R' — only matters for dual positions
+  // Mighty X state
+  mxSide: 'left',
+  mxLevel: 1,
+  mxShot: 'follow',
+  // Wagon Wheel state
+  wagonSpoke: 0,             // index into WAGON_SPOKES (0-11)
+  wagonRandom: false,
 };
 
 // ── Persistence ─────────────────────────────────────
@@ -499,6 +535,152 @@ function getCycleProgress() {
     if (isBallComplete(b)) done++;
   }
   return { done, total: 12 };
+}
+
+// ── Mighty X Data Functions ─────────────────────────
+
+function getMxEntry(key) {
+  const session = getActiveSession();
+  return session.data[key] || null;
+}
+
+function saveMxEntry(key, attempts) {
+  const data = getAppData();
+  const session = data.sessions.find(s => s.id === data.activeSessionId);
+  const prev = session.data[key];
+  session.data[key] = { attempts, note: (prev && prev.note) || '' };
+  saveData(data);
+}
+
+function saveMxNote(key, note) {
+  const data = getAppData();
+  const session = data.sessions.find(s => s.id === data.activeSessionId);
+  if (!session.data[key]) session.data[key] = { attempts: 0, note };
+  else session.data[key].note = note;
+  saveData(data);
+}
+
+function isMxEntryComplete(key) {
+  const entry = getMxEntry(key);
+  return entry && entry.attempts >= 2;
+}
+
+function isMxCycleComplete() {
+  for (const side of MX_SIDES)
+    for (const level of MX_LEVELS)
+      for (const shot of MX_SHOTS)
+        if (!isMxEntryComplete(mxKey(side, level, shot))) return false;
+  return true;
+}
+
+function getMxCycleProgress() {
+  let done = 0;
+  for (const side of MX_SIDES)
+    for (const level of MX_LEVELS)
+      for (const shot of MX_SHOTS)
+        if (isMxEntryComplete(mxKey(side, level, shot))) done++;
+  return { done, total: 24 };
+}
+
+function getMxSessionTotal() {
+  const session = getActiveSession();
+  let total = 0;
+  for (const key of Object.keys(session.data)) {
+    if (session.data[key] && session.data[key].attempts) total += session.data[key].attempts;
+  }
+  return total;
+}
+
+function mxCurrentKey() {
+  return mxKey(state.mxSide, state.mxLevel, state.mxShot);
+}
+
+function mxResumeProgression() {
+  for (const side of MX_SIDES) {
+    for (const level of MX_LEVELS) {
+      for (const shot of MX_SHOTS) {
+        if (!isMxEntryComplete(mxKey(side, level, shot))) {
+          state.mxSide = side;
+          state.mxLevel = level;
+          state.mxShot = shot;
+          return;
+        }
+      }
+    }
+  }
+}
+
+// ── Wagon Wheel Data Functions ──────────────────────
+
+function getWagonEntry(spokeIdx) {
+  const session = getActiveSession();
+  return session.data[wagonKey(spokeIdx)] || null;
+}
+
+function saveWagonEntry(spokeIdx, attempts) {
+  const data = getAppData();
+  const session = data.sessions.find(s => s.id === data.activeSessionId);
+  const key = wagonKey(spokeIdx);
+  const prev = session.data[key];
+  session.data[key] = { attempts, note: (prev && prev.note) || '' };
+  saveData(data);
+}
+
+function saveWagonNote(spokeIdx, note) {
+  const data = getAppData();
+  const session = data.sessions.find(s => s.id === data.activeSessionId);
+  const key = wagonKey(spokeIdx);
+  if (!session.data[key]) session.data[key] = { attempts: 0, note };
+  else session.data[key].note = note;
+  saveData(data);
+}
+
+function isWagonSpokeComplete(spokeIdx) {
+  const entry = getWagonEntry(spokeIdx);
+  return entry && entry.attempts >= 2;
+}
+
+function isWagonCycleComplete() {
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    if (!isWagonSpokeComplete(i)) return false;
+  }
+  return true;
+}
+
+function getWagonCycleProgress() {
+  let done = 0;
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    if (isWagonSpokeComplete(i)) done++;
+  }
+  return { done, total: WAGON_SPOKES.length };
+}
+
+function getWagonSessionTotal() {
+  const session = getActiveSession();
+  let total = 0;
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    const entry = session.data[wagonKey(i)];
+    if (entry && entry.attempts) total += entry.attempts;
+  }
+  return total;
+}
+
+function wagonResumeProgression() {
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    if (!isWagonSpokeComplete(i)) {
+      state.wagonSpoke = i;
+      return;
+    }
+  }
+}
+
+function wagonPickRandom() {
+  const incomplete = [];
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    if (!isWagonSpokeComplete(i)) incomplete.push(i);
+  }
+  if (incomplete.length === 0) return;
+  state.wagonSpoke = incomplete[Math.floor(Math.random() * incomplete.length)];
 }
 
 // ── SVG Table Diagram ───────────────────────────────
@@ -873,31 +1055,27 @@ function renderDrillTypeTabs() {
 function switchDrillType(type) {
   if (type === state.drillType) return;
   state.drillType = type;
-  // Switch to the most recent session of this type (or create one)
   getActiveSessionForType(type);
-  state.selectedBall = 1;
-  state.selectedPosition = null;
   state.currentInput = '2';
   state.freshInput = true;
-  if (type === 'positions') resumeProgression();
+  if (type === 'positions') {
+    state.selectedBall = 1;
+    state.selectedPosition = null;
+    resumeProgression();
+  } else if (type === 'mightyx') {
+    mxResumeProgression();
+  } else if (type === 'wagon') {
+    wagonResumeProgression();
+  }
   renderAll();
-  updateDrillVisibility();
 }
 
 function updateDrillVisibility() {
   const isPositions = state.drillType === 'positions';
-  // Main content areas — hide positions-specific UI when other drill types selected
   const positionsContent = document.getElementById('positions-content');
   const otherContent = document.getElementById('other-drill-content');
   if (positionsContent) positionsContent.style.display = isPositions ? '' : 'none';
-  if (otherContent) {
-    otherContent.style.display = isPositions ? 'none' : 'flex';
-    if (!isPositions) {
-      const info = DRILL_TYPES[state.drillType];
-      otherContent.innerHTML = `<div class="coming-soon"><span class="coming-soon-icon">${info.icon}</span><h2>${info.label}</h2><p>Coming soon</p></div>`;
-    }
-  }
-  // Cycle bar adapts per drill type
+  if (otherContent) otherContent.style.display = isPositions ? 'none' : '';
   const cycleBar = document.getElementById('cycle-bar');
   if (cycleBar) cycleBar.style.display = isPositions ? '' : 'none';
 }
@@ -943,29 +1121,42 @@ function startNewCycle() {
   data.sessions.push(session);
   data.activeSessionId = session.id;
   saveData(data);
-  state.selectedBall = 1;
-  state.selectedPosition = null;
   state.currentInput = '2';
   state.freshInput = true;
-  state.shotType = 'cut';
-  resumeProgression();
+  if (state.drillType === 'positions') {
+    state.selectedBall = 1;
+    state.selectedPosition = null;
+    state.shotType = 'cut';
+    resumeProgression();
+  } else if (state.drillType === 'mightyx') {
+    state.mxSide = 'left'; state.mxLevel = 1; state.mxShot = 'follow';
+  } else if (state.drillType === 'wagon') {
+    state.wagonSpoke = 0;
+  }
   renderAll();
   showToast('New cycle started');
 }
 
 function renderAll() {
   renderDrillTypeTabs();
-  ensureValidPosition();
-  applyShotType();
-  renderBallSelector();
-  renderDisplay();
-  renderDirToggle();
-  renderTotals();
   renderSessionSelector();
-  renderCycleProgress();
-  renderTableDiagram();
-  renderShotInfo();
   updateDrillVisibility();
+
+  if (state.drillType === 'positions') {
+    ensureValidPosition();
+    applyShotType();
+    renderBallSelector();
+    renderDisplay();
+    renderDirToggle();
+    renderTotals();
+    renderCycleProgress();
+    renderTableDiagram();
+    renderShotInfo();
+  } else if (state.drillType === 'mightyx') {
+    renderMightyX();
+  } else if (state.drillType === 'wagon') {
+    renderWagonWheel();
+  }
 }
 
 // ── Actions ─────────────────────────────────────────
@@ -1132,18 +1323,30 @@ function newSession() {
   if (state.drillType === 'positions' && !isCycleComplete()) {
     const { done } = getCycleProgress();
     if (!confirm(`Current cycle has ${done}/12 drills complete. Start a new cycle anyway? (Current progress will be kept in history.)`)) return;
+  } else if (state.drillType === 'mightyx' && !isMxCycleComplete()) {
+    const { done } = getMxCycleProgress();
+    if (!confirm(`Current cycle has ${done}/24 entries complete. Start a new cycle anyway?`)) return;
+  } else if (state.drillType === 'wagon' && !isWagonCycleComplete()) {
+    const { done } = getWagonCycleProgress();
+    if (!confirm(`Current cycle has ${done}/12 spokes complete. Start a new cycle anyway?`)) return;
   }
   const data = getAppData();
   const session = createSession(state.drillType);
   data.sessions.push(session);
   data.activeSessionId = session.id;
   saveData(data);
-  state.selectedBall = 1;
-  state.selectedPosition = null;
   state.currentInput = '2';
   state.freshInput = true;
-  state.shotType = 'cut';
-  if (state.drillType === 'positions') resumeProgression();
+  if (state.drillType === 'positions') {
+    state.selectedBall = 1;
+    state.selectedPosition = null;
+    state.shotType = 'cut';
+    resumeProgression();
+  } else if (state.drillType === 'mightyx') {
+    state.mxSide = 'left'; state.mxLevel = 1; state.mxShot = 'follow';
+  } else if (state.drillType === 'wagon') {
+    state.wagonSpoke = 0;
+  }
   renderAll();
   showToast('New cycle started');
 }
@@ -1182,11 +1385,17 @@ function switchSession(id) {
   const data = getAppData();
   data.activeSessionId = id;
   saveData(data);
-  state.selectedBall = 1;
-  state.selectedPosition = null;
   state.currentInput = '2';
   state.freshInput = true;
-  resumeProgression();
+  if (state.drillType === 'positions') {
+    state.selectedBall = 1;
+    state.selectedPosition = null;
+    resumeProgression();
+  } else if (state.drillType === 'mightyx') {
+    mxResumeProgression();
+  } else if (state.drillType === 'wagon') {
+    wagonResumeProgression();
+  }
   renderAll();
 }
 
@@ -1212,6 +1421,457 @@ function exportData() {
   a.click();
   URL.revokeObjectURL(url);
   showToast('Data exported');
+}
+
+// ── Mighty X Rendering ──────────────────────────────
+
+function renderMxTableSvg() {
+  const margin = 14, railW = 10, dSpaceX = 46, dSpaceY = 46;
+  const gridCols = 8, gridRows = 4;
+  const innerW = gridCols * dSpaceX, innerH = gridRows * dSpaceY;
+  const totalW = innerW + 2 * railW + 2 * margin;
+  const totalH = innerH + 2 * railW + 2 * margin;
+  const ox = margin + railW, oy = margin + railW + innerH;
+  function dx(col) { return ox + col * dSpaceX; }
+  function dy(row) { return oy - row * dSpaceY; }
+
+  let svg = `<svg class="table-svg" viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<defs><linearGradient id="mx-rail" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5d4037"/><stop offset="100%" stop-color="#4a3228"/></linearGradient></defs>`;
+  svg += `<rect x="${margin}" y="${margin}" width="${innerW + 2 * railW}" height="${innerH + 2 * railW}" rx="10" fill="url(#mx-rail)"/>`;
+  svg += `<rect x="${ox}" y="${margin + railW}" width="${innerW}" height="${innerH}" rx="2" fill="#2a7a35"/>`;
+  svg += `<rect x="${margin}" y="${margin}" width="${innerW + 2 * railW}" height="${innerH + 2 * railW}" rx="10" fill="none" stroke="#3e2723" stroke-width="2"/>`;
+
+  const pockets = [[0,0],[0,4],[4,0],[4,4],[8,0],[8,4]];
+  for (const [c, r] of pockets) {
+    svg += `<circle cx="${dx(c)}" cy="${dy(r)}" r="8" fill="#0a0a0a"/>`;
+  }
+
+  // X diagonal lines
+  svg += `<line x1="${dx(0.3)}" y1="${dy(0.15)}" x2="${dx(7.7)}" y2="${dy(3.85)}" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" stroke-dasharray="6,4"/>`;
+  svg += `<line x1="${dx(0.3)}" y1="${dy(3.85)}" x2="${dx(7.7)}" y2="${dy(0.15)}" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" stroke-dasharray="6,4"/>`;
+
+  // Center marker (OB)
+  svg += `<circle cx="${dx(4)}" cy="${dy(2)}" r="7" fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>`;
+  svg += `<text x="${dx(4)}" y="${dy(2) + 3}" text-anchor="middle" font-size="7" font-weight="700" fill="rgba(255,255,255,0.5)">OB</text>`;
+
+  // Distance markers along X arms
+  const arms = { 'left-upper': [], 'left-lower': [], 'right-upper': [], 'right-lower': [] };
+  for (let i = 0; i < 4; i++) {
+    const t = (i + 1) / 5;
+    arms['left-upper'].push({ col: 4 - t * 4, row: 2 + t * 2 });
+    arms['left-lower'].push({ col: 4 - t * 4, row: 2 - t * 2 });
+    arms['right-upper'].push({ col: 4 + t * 4, row: 2 + t * 2 });
+    arms['right-lower'].push({ col: 4 + t * 4, row: 2 - t * 2 });
+  }
+
+  for (const side of MX_SIDES) {
+    const upperArm = arms[side + '-upper'];
+    const lowerArm = arms[side + '-lower'];
+    for (let li = 0; li < 4; li++) {
+      const level = li + 1;
+      let doneCount = 0;
+      for (const shot of MX_SHOTS) {
+        if (isMxEntryComplete(mxKey(side, level, shot))) doneCount++;
+      }
+      const isCurrent = side === state.mxSide && level === state.mxLevel;
+      const fill = doneCount === 3 ? '#6ee7a0' : doneCount > 0 ? 'rgba(110,231,160,0.4)' : 'rgba(255,255,255,0.15)';
+
+      for (const arm of [upperArm, lowerArm]) {
+        const pos = arm[li];
+        const x = dx(pos.col), y = dy(pos.row);
+        const r = isCurrent ? 11 : 7;
+        svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="${isCurrent ? '#fff' : fill}" ${isCurrent ? 'stroke="#fff" stroke-width="2"' : ''}/>`;
+        if (doneCount > 0 && !isCurrent) {
+          svg += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-size="7" font-weight="700" fill="#0a0a0a" style="pointer-events:none">${doneCount}</text>`;
+        }
+        if (isCurrent) {
+          svg += `<text x="${x}" y="${y + 3.5}" text-anchor="middle" font-size="8" font-weight="700" fill="#0a0a0a" style="pointer-events:none">▶</text>`;
+        }
+      }
+
+      // Level number label (on upper arm only)
+      const uPos = upperArm[li];
+      svg += `<text x="${dx(uPos.col)}" y="${dy(uPos.row) - (isCurrent ? 14 : 10)}" text-anchor="middle" font-size="6" font-weight="600" fill="rgba(255,255,255,0.3)" style="pointer-events:none">L${level}</text>`;
+    }
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+function renderMightyX() {
+  const container = document.getElementById('other-drill-content');
+  if (!container) return;
+  const currentKey = mxCurrentKey();
+  const entry = getMxEntry(currentKey);
+  const { done } = getMxCycleProgress();
+
+  let html = `<div class="drill-layout">`;
+
+  // Left: Table diagram
+  html += `<div class="drill-left">`;
+  html += `<div class="table-container">${renderMxTableSvg()}</div>`;
+  // Current entry info
+  html += `<div class="drill-info">`;
+  html += `<span style="color:${state.mxSide === 'left' ? '#7aa2f7' : '#e8a23a'}">${state.mxSide === 'left' ? '← Left' : 'Right →'}</span>`;
+  html += ` · Level ${state.mxLevel} · `;
+  html += `<span style="color:${MX_SHOT_COLORS[state.mxShot]}">${MX_SHOT_LABELS[state.mxShot]}</span>`;
+  html += `</div>`;
+  html += `</div>`;
+
+  // Right: Controls
+  html += `<div class="drill-right">`;
+
+  // Side selector
+  html += `<div class="drill-selector"><div class="selector-label">Side</div><div class="drill-toggle">`;
+  for (const side of MX_SIDES) {
+    html += `<button class="drill-toggle-btn ${side === state.mxSide ? 'active' : ''}" data-mx-side="${side}">${side === 'left' ? '← Left' : 'Right →'}</button>`;
+  }
+  html += `</div></div>`;
+
+  // Level selector
+  html += `<div class="drill-selector"><div class="selector-label">Distance Level</div><div class="drill-toggle">`;
+  for (const level of MX_LEVELS) {
+    const allDone = MX_SHOTS.every(s => isMxEntryComplete(mxKey(state.mxSide, level, s)));
+    html += `<button class="drill-toggle-btn ${level === state.mxLevel ? 'active' : ''} ${allDone ? 'done' : ''}" data-mx-level="${level}">${level}◆</button>`;
+  }
+  html += `</div></div>`;
+
+  // Shot type selector
+  html += `<div class="drill-selector"><div class="selector-label">Shot Type</div><div class="drill-toggle">`;
+  for (const shot of MX_SHOTS) {
+    const k = mxKey(state.mxSide, state.mxLevel, shot);
+    const complete = isMxEntryComplete(k);
+    html += `<button class="drill-toggle-btn mx-shot-btn ${shot === state.mxShot ? 'active' : ''} ${complete ? 'done' : ''}" data-mx-shot="${shot}" style="--shot-color:${MX_SHOT_COLORS[shot]}">${MX_SHOT_LABELS[shot]}</button>`;
+  }
+  html += `</div></div>`;
+
+  // Input row
+  html += `<div class="input-row">`;
+  html += `<div class="attempt-display" id="drill-attempt-display"><span class="attempt-number" id="drill-attempt-number">${state.currentInput}</span></div>`;
+  html += `<div class="totals-col">`;
+  html += `<div class="stat-card"><div class="stat-label">Entry</div><div class="stat-value" style="color:${MX_SHOT_COLORS[state.mxShot]}">${entry && entry.attempts ? entry.attempts : '—'}</div><div class="stat-sub">${MX_SHOT_LABELS[state.mxShot]}</div></div>`;
+  html += `<div class="stat-card"><div class="stat-label">Cycle</div><div class="stat-value">${done}</div><div class="stat-sub">${done}/24</div></div>`;
+  html += `</div></div>`;
+
+  // Numpad
+  html += `<div class="numpad">`;
+  for (let d = 1; d <= 9; d++) html += `<button class="numpad-btn num-digit" data-digit="${d}">${d}</button>`;
+  html += `<button class="numpad-btn num-backspace" data-action="backspace">⌫</button>`;
+  html += `<button class="numpad-btn num-digit" data-digit="0">0</button>`;
+  html += `<button class="numpad-btn num-save" data-action="save">Save</button>`;
+  html += `</div>`;
+
+  // Note
+  html += `<div class="note-row"><input type="text" class="note-input" id="drill-note-input" placeholder="Note…" maxlength="80" autocomplete="off" value="${escAttr((entry && entry.note) || '')}"></div>`;
+  html += `</div>`; // drill-right
+
+  // Cycle progress dots
+  html += `<div class="drill-progress">`;
+  html += `<div class="cycle-dots">`;
+  for (const side of MX_SIDES) {
+    for (const level of MX_LEVELS) {
+      for (const shot of MX_SHOTS) {
+        const k = mxKey(side, level, shot);
+        const isDone = isMxEntryComplete(k);
+        const isCurr = k === currentKey;
+        html += `<span class="cycle-dot ${isDone ? 'done' : ''} ${isCurr ? 'current' : ''}" title="${side} L${level} ${shot}">${shot[0].toUpperCase()}</span>`;
+      }
+    }
+  }
+  html += `</div>`;
+  html += `<div class="cycle-count">${done} / 24</div>`;
+  html += `</div>`;
+
+  html += `</div>`; // drill-layout
+  container.innerHTML = html;
+  attachDrillHandlers('mx');
+}
+
+// ── Wagon Wheel Rendering ───────────────────────────
+
+function renderWagonTableSvg() {
+  const margin = 14, railW = 10, dSpaceX = 46, dSpaceY = 46;
+  const gridCols = 8, gridRows = 4;
+  const innerW = gridCols * dSpaceX, innerH = gridRows * dSpaceY;
+  const totalW = innerW + 2 * railW + 2 * margin;
+  const totalH = innerH + 2 * railW + 2 * margin;
+  const ox = margin + railW, oy = margin + railW + innerH;
+  function dx(col) { return ox + col * dSpaceX; }
+  function dy(row) { return oy - row * dSpaceY; }
+
+  let svg = `<svg class="table-svg" viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<defs><linearGradient id="ww-rail" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5d4037"/><stop offset="100%" stop-color="#4a3228"/></linearGradient></defs>`;
+  svg += `<rect x="${margin}" y="${margin}" width="${innerW + 2 * railW}" height="${innerH + 2 * railW}" rx="10" fill="url(#ww-rail)"/>`;
+  svg += `<rect x="${ox}" y="${margin + railW}" width="${innerW}" height="${innerH}" rx="2" fill="#2a7a35"/>`;
+  svg += `<rect x="${margin}" y="${margin}" width="${innerW + 2 * railW}" height="${innerH + 2 * railW}" rx="10" fill="none" stroke="#3e2723" stroke-width="2"/>`;
+
+  const pockets = [[0,0],[0,4],[4,0],[4,4],[8,0],[8,4]];
+  for (const [c, r] of pockets) {
+    svg += `<circle cx="${dx(c)}" cy="${dy(r)}" r="8" fill="#0a0a0a"/>`;
+  }
+
+  const cx = dx(4), cy = dy(2);
+
+  // Center hub
+  svg += `<circle cx="${cx}" cy="${cy}" r="5" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>`;
+
+  // Spokes and endpoints
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    const spoke = WAGON_SPOKES[i];
+    const sx = dx(spoke.col), sy = dy(spoke.row);
+    const complete = isWagonSpokeComplete(i);
+    const isCurrent = i === state.wagonSpoke;
+    const strokeColor = complete ? 'rgba(110,231,160,0.3)' : isCurrent ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.06)';
+    svg += `<line x1="${cx}" y1="${cy}" x2="${sx}" y2="${sy}" stroke="${strokeColor}" stroke-width="1.5"/>`;
+
+    const r = isCurrent ? 13 : 10;
+    let fill;
+    if (isCurrent) fill = '#ffffffdd';
+    else if (complete) fill = '#6ee7a0';
+    else fill = 'rgba(255,255,255,0.2)';
+
+    svg += `<circle cx="${sx}" cy="${sy}" r="${r}" fill="${fill}" ${isCurrent ? 'stroke="#fff" stroke-width="2"' : ''} data-spoke="${i}" class="spoke-marker" style="cursor:pointer"/>`;
+
+    const entry = getWagonEntry(i);
+    if (complete && !isCurrent) {
+      svg += `<text x="${sx}" y="${sy + 3}" text-anchor="middle" font-size="9" font-weight="700" fill="#0a0a0a" style="pointer-events:none">${entry ? entry.attempts : '✓'}</text>`;
+    } else if (isCurrent) {
+      svg += `<text x="${sx}" y="${sy + 4}" text-anchor="middle" font-size="10" font-weight="700" fill="#0a0a0a" style="pointer-events:none">▶</text>`;
+    } else {
+      svg += `<text x="${sx}" y="${sy + 3}" text-anchor="middle" font-size="7" font-weight="600" fill="rgba(255,255,255,0.5)" style="pointer-events:none">${i + 1}</text>`;
+    }
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+function renderWagonWheel() {
+  const container = document.getElementById('other-drill-content');
+  if (!container) return;
+  const entry = getWagonEntry(state.wagonSpoke);
+  const spoke = WAGON_SPOKES[state.wagonSpoke];
+  const { done } = getWagonCycleProgress();
+
+  let html = `<div class="drill-layout">`;
+
+  // Left: Table diagram
+  html += `<div class="drill-left">`;
+  html += `<div class="table-container" id="wagon-table-container">${renderWagonTableSvg()}</div>`;
+  html += `<div class="drill-info">`;
+  html += `Spoke <strong>${state.wagonSpoke + 1}</strong> · ${spoke.label}`;
+  if (state.wagonSpoke === 11) html += ` <span style="color:#e8a23a">(straight draw)</span>`;
+  html += `</div>`;
+  html += `</div>`;
+
+  // Right: Controls
+  html += `<div class="drill-right">`;
+
+  // Spoke selector grid
+  html += `<div class="drill-selector"><div class="selector-label">Spoke</div><div class="wagon-spoke-grid">`;
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    const complete = isWagonSpokeComplete(i);
+    html += `<button class="wagon-spoke-btn ${i === state.wagonSpoke ? 'selected' : ''} ${complete ? 'done' : ''}" data-spoke="${i}">${complete ? '✓' : i + 1}</button>`;
+  }
+  html += `</div></div>`;
+
+  // Random toggle
+  html += `<div class="drill-selector"><div class="drill-toggle">`;
+  html += `<button class="drill-toggle-btn ${!state.wagonRandom ? 'active' : ''}" data-wagon-mode="seq">Sequential</button>`;
+  html += `<button class="drill-toggle-btn ${state.wagonRandom ? 'active' : ''}" data-wagon-mode="rand">🎲 Random</button>`;
+  html += `</div></div>`;
+
+  // Input row
+  html += `<div class="input-row">`;
+  html += `<div class="attempt-display" id="drill-attempt-display"><span class="attempt-number" id="drill-attempt-number">${state.currentInput}</span></div>`;
+  html += `<div class="totals-col">`;
+  html += `<div class="stat-card"><div class="stat-label">Spoke ${state.wagonSpoke + 1}</div><div class="stat-value">${entry && entry.attempts ? entry.attempts : '—'}</div><div class="stat-sub">${spoke.label}</div></div>`;
+  html += `<div class="stat-card"><div class="stat-label">Cycle</div><div class="stat-value">${done}</div><div class="stat-sub">${done}/12</div></div>`;
+  html += `</div></div>`;
+
+  // Numpad
+  html += `<div class="numpad">`;
+  for (let d = 1; d <= 9; d++) html += `<button class="numpad-btn num-digit" data-digit="${d}">${d}</button>`;
+  html += `<button class="numpad-btn num-backspace" data-action="backspace">⌫</button>`;
+  html += `<button class="numpad-btn num-digit" data-digit="0">0</button>`;
+  html += `<button class="numpad-btn num-save" data-action="save">Save</button>`;
+  html += `</div>`;
+
+  // Note
+  html += `<div class="note-row"><input type="text" class="note-input" id="drill-note-input" placeholder="Note…" maxlength="80" autocomplete="off" value="${escAttr((entry && entry.note) || '')}"></div>`;
+  html += `</div>`; // drill-right
+
+  // Cycle progress dots
+  html += `<div class="drill-progress">`;
+  html += `<div class="cycle-dots">`;
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    const isDone = isWagonSpokeComplete(i);
+    const isCurr = i === state.wagonSpoke;
+    html += `<span class="cycle-dot ${isDone ? 'done' : ''} ${isCurr ? 'current' : ''}">${i + 1}</span>`;
+  }
+  html += `</div>`;
+  html += `<div class="cycle-count">${done} / 12</div>`;
+  html += `</div>`;
+
+  html += `</div>`; // drill-layout
+  container.innerHTML = html;
+
+  // Attach spoke click handlers on SVG
+  const tableContainer = document.getElementById('wagon-table-container');
+  if (tableContainer) {
+    tableContainer.querySelectorAll('.spoke-marker').forEach(el => {
+      el.addEventListener('click', () => {
+        state.wagonSpoke = parseInt(el.getAttribute('data-spoke'));
+        state.currentInput = '2'; state.freshInput = true;
+        renderAll();
+      });
+    });
+  }
+
+  attachDrillHandlers('wagon');
+}
+
+// ── Shared Drill Handlers ───────────────────────────
+
+function escAttr(s) { return s.replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function attachDrillHandlers(type) {
+  const container = document.getElementById('other-drill-content');
+  if (!container) return;
+
+  // MX-specific selectors
+  if (type === 'mx') {
+    container.querySelectorAll('[data-mx-side]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.mxSide = btn.dataset.mxSide;
+        state.currentInput = '2'; state.freshInput = true;
+        renderAll();
+      });
+    });
+    container.querySelectorAll('[data-mx-level]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.mxLevel = parseInt(btn.dataset.mxLevel);
+        state.currentInput = '2'; state.freshInput = true;
+        renderAll();
+      });
+    });
+    container.querySelectorAll('[data-mx-shot]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.mxShot = btn.dataset.mxShot;
+        state.currentInput = '2'; state.freshInput = true;
+        renderAll();
+      });
+    });
+  }
+
+  // Wagon-specific selectors
+  if (type === 'wagon') {
+    container.querySelectorAll('[data-spoke]').forEach(btn => {
+      if (btn.classList.contains('spoke-marker')) return; // SVG handled separately
+      btn.addEventListener('click', () => {
+        state.wagonSpoke = parseInt(btn.dataset.spoke);
+        state.currentInput = '2'; state.freshInput = true;
+        renderAll();
+      });
+    });
+    container.querySelectorAll('[data-wagon-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.wagonRandom = btn.dataset.wagonMode === 'rand';
+        renderAll();
+      });
+    });
+  }
+
+  // Numpad digits
+  container.querySelectorAll('[data-digit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const d = parseInt(btn.dataset.digit);
+      if (state.freshInput) { state.currentInput = String(d); state.freshInput = false; }
+      else if (state.currentInput.length < 3) { state.currentInput += String(d); }
+      const numEl = document.getElementById('drill-attempt-number');
+      if (numEl) numEl.textContent = state.currentInput;
+    });
+  });
+
+  // Backspace
+  const bsBtn = container.querySelector('[data-action="backspace"]');
+  if (bsBtn) bsBtn.addEventListener('click', () => {
+    if (state.currentInput.length <= 1) { state.currentInput = '2'; state.freshInput = true; }
+    else { state.currentInput = state.currentInput.slice(0, -1); }
+    const numEl = document.getElementById('drill-attempt-number');
+    if (numEl) numEl.textContent = state.currentInput;
+  });
+
+  // Save
+  const saveBtn = container.querySelector('[data-action="save"]');
+  if (saveBtn) saveBtn.addEventListener('click', () => {
+    if (type === 'mx') pressSaveMx();
+    else if (type === 'wagon') pressSaveWagon();
+  });
+
+  // Note
+  const noteInput = document.getElementById('drill-note-input');
+  if (noteInput) {
+    noteInput.addEventListener('change', () => {
+      if (type === 'mx') saveMxNote(mxCurrentKey(), noteInput.value);
+      else if (type === 'wagon') saveWagonNote(state.wagonSpoke, noteInput.value);
+    });
+    noteInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') noteInput.blur(); });
+  }
+}
+
+function pressSaveMx() {
+  const attempts = parseInt(state.currentInput, 10);
+  if (isNaN(attempts) || attempts < 2) { showToast('Minimum 2 attempts'); return; }
+  saveMxEntry(mxCurrentKey(), attempts);
+
+  // Flash
+  const display = document.getElementById('drill-attempt-display');
+  if (display) { display.classList.add('flash'); setTimeout(() => display.classList.remove('flash'), 400); }
+
+  // Auto-advance to next incomplete
+  mxResumeProgression();
+  state.currentInput = '2';
+  state.freshInput = true;
+  renderAll();
+
+  if (isMxCycleComplete()) {
+    showDrillCycleComplete('All 24 Mighty X drills finished!', 24, getMxSessionTotal());
+  }
+}
+
+function pressSaveWagon() {
+  const attempts = parseInt(state.currentInput, 10);
+  if (isNaN(attempts) || attempts < 2) { showToast('Minimum 2 attempts'); return; }
+  saveWagonEntry(state.wagonSpoke, attempts);
+
+  // Flash
+  const display = document.getElementById('drill-attempt-display');
+  if (display) { display.classList.add('flash'); setTimeout(() => display.classList.remove('flash'), 400); }
+
+  // Auto-advance
+  if (state.wagonRandom) wagonPickRandom();
+  else wagonResumeProgression();
+  state.currentInput = '2';
+  state.freshInput = true;
+  renderAll();
+
+  if (isWagonCycleComplete()) {
+    showDrillCycleComplete('All 12 Wagon Wheel spokes finished!', 12, getWagonSessionTotal());
+  }
+}
+
+function showDrillCycleComplete(text, entries, totalAttempts) {
+  const modal = document.getElementById('cycle-modal');
+  const backdrop = document.getElementById('cycle-modal-backdrop');
+  if (!modal || !backdrop) return;
+  const statsEl = document.getElementById('cycle-modal-stats');
+  const textEl = modal.querySelector('.cycle-modal-text');
+  if (textEl) textEl.textContent = text;
+  if (statsEl) statsEl.textContent = `${entries} entries · ${totalAttempts} total attempts`;
+  modal.style.display = 'flex';
+  backdrop.style.display = 'block';
 }
 
 // ── Init ────────────────────────────────────────────

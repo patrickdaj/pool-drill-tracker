@@ -251,6 +251,14 @@ function renderMiniTable(ballNum, ballStats) {
 }
 
 function renderStats() {
+  if (statsDrillType === 'mightyx') return renderMxStats();
+  if (statsDrillType === 'wagon') return renderWagonStats();
+  renderPositionsStats();
+}
+
+function renderPositionsStats() {
+  // Show positions-specific sections
+  document.querySelectorAll('.stats-section').forEach(s => s.style.display = '');
   const viewData = getViewData();
   const s = computeStats(viewData);
   const viewSessions = getViewSessions();
@@ -398,6 +406,182 @@ function renderStats() {
   } else {
     trendsSection.style.display = 'none';
   }
+}
+
+// ── Mighty X Stats ──────────────────────────────────
+
+function computeMxStats(sessions) {
+  const bySide = { left: { sum: 0, count: 0 }, right: { sum: 0, count: 0 } };
+  const byLevel = {};
+  for (const l of MX_LEVELS) byLevel[l] = { sum: 0, count: 0 };
+  const byShot = {};
+  for (const s of MX_SHOTS) byShot[s] = { sum: 0, count: 0 };
+  let totalAttempts = 0, totalSlots = 0;
+
+  for (const session of sessions) {
+    for (const side of MX_SIDES) {
+      for (const level of MX_LEVELS) {
+        for (const shot of MX_SHOTS) {
+          const entry = session.data[mxKey(side, level, shot)];
+          if (entry && entry.attempts >= 2) {
+            const a = entry.attempts;
+            bySide[side].sum += a; bySide[side].count++;
+            byLevel[level].sum += a; byLevel[level].count++;
+            byShot[shot].sum += a; byShot[shot].count++;
+            totalAttempts += a; totalSlots++;
+          }
+        }
+      }
+    }
+  }
+  const sessionAvg = totalSlots > 0 ? totalAttempts / totalSlots : 0;
+  const sessionPct = totalSlots > 0 ? (REQUIRED_MAKES / sessionAvg * 100) : 0;
+  return { bySide, byLevel, byShot, totalAttempts, totalSlots, sessionAvg, sessionPct };
+}
+
+function renderMxStats() {
+  const sessions = getViewSessions();
+  const s = computeMxStats(sessions);
+
+  const sessionSelect = document.getElementById('session-select');
+  sessionSelect.style.display = statsView === 'session' ? '' : 'none';
+
+  const overviewTitle = document.getElementById('stats-overview-title');
+  overviewTitle.textContent = statsView === 'session' ? 'Session Overview' : statsView === 'trending' ? `Trending — Last ${sessions.length}` : `History — ${sessions.length} Sessions`;
+
+  const sg = document.getElementById('stats-session-grid');
+  const isMulti = statsView !== 'session';
+  sg.innerHTML = `
+    <div class="stats-item"><div class="stats-item-value">${s.sessionPct.toFixed(0)}%</div><div class="stats-item-label">Hit Rate</div></div>
+    <div class="stats-item"><div class="stats-item-value">${s.sessionAvg.toFixed(1)}</div><div class="stats-item-label">Avg Attempts</div></div>
+    <div class="stats-item"><div class="stats-item-value">${s.totalSlots}/24</div><div class="stats-item-label">${isMulti ? 'Entries Seen' : 'Filled'}</div></div>
+    <div class="stats-item"><div class="stats-item-value">${isMulti ? sessions.length : s.totalAttempts}</div><div class="stats-item-label">${isMulti ? 'Sessions' : 'Total Attempts'}</div></div>
+  `;
+
+  // By Side → use type grid
+  const tg = document.getElementById('stats-type-grid');
+  const sideHtml = (label, d) => {
+    const avg = d.count > 0 ? d.sum / d.count : 0;
+    const pct = avg > 0 ? hitPct(avg) : 0;
+    return `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${label} (${d.count})</div></div>`;
+  };
+  tg.innerHTML = sideHtml('← Left', s.bySide.left) + sideHtml('Right →', s.bySide.right);
+  tg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'By Side';
+
+  // By Shot Type → use angle grid
+  const ag = document.getElementById('stats-angle-grid');
+  if (ag) {
+    let shotHtml = '';
+    for (const shot of MX_SHOTS) {
+      const d = s.byShot[shot];
+      const avg = d.count > 0 ? d.sum / d.count : 0;
+      const pct = avg > 0 ? hitPct(avg) : 0;
+      const label = shot.charAt(0).toUpperCase() + shot.slice(1);
+      shotHtml += `<div class="stats-item"><div class="stats-item-value" style="color:${MX_SHOT_COLORS[shot]}">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${label} (${d.count})</div></div>`;
+    }
+    ag.innerHTML = shotHtml;
+    ag.closest('.stats-section').querySelector('.stats-section-title').textContent = 'By Shot Type';
+    ag.closest('.stats-section').style.display = '';
+  }
+
+  // By Level → use distance grid
+  const dg = document.getElementById('stats-distance-grid');
+  let levelHtml = '';
+  for (const level of MX_LEVELS) {
+    const d = s.byLevel[level];
+    const avg = d.count > 0 ? d.sum / d.count : 0;
+    const pct = avg > 0 ? hitPct(avg) : 0;
+    levelHtml += `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">Level ${level} (${d.count})</div></div>`;
+  }
+  dg.innerHTML = levelHtml;
+  dg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'By Distance Level';
+  dg.closest('.stats-section').style.display = '';
+
+  // Hide irrelevant sections
+  const cg = document.getElementById('stats-cutdir-grid');
+  if (cg) cg.closest('.stats-section').style.display = 'none';
+  const rg = document.getElementById('stats-rail-grid');
+  rg.closest('.stats-section').style.display = 'none';
+  document.getElementById('stats-ball-list').closest('.stats-section').style.display = 'none';
+  document.getElementById('stats-trends-section').style.display = 'none';
+}
+
+// ── Wagon Wheel Stats ───────────────────────────────
+
+function computeWagonStats(sessions) {
+  const bySpoke = [];
+  for (let i = 0; i < WAGON_SPOKES.length; i++) bySpoke.push({ sum: 0, count: 0 });
+  let totalAttempts = 0, totalSlots = 0;
+
+  for (const session of sessions) {
+    for (let i = 0; i < WAGON_SPOKES.length; i++) {
+      const entry = session.data[wagonKey(i)];
+      if (entry && entry.attempts >= 2) {
+        bySpoke[i].sum += entry.attempts;
+        bySpoke[i].count++;
+        totalAttempts += entry.attempts;
+        totalSlots++;
+      }
+    }
+  }
+  const sessionAvg = totalSlots > 0 ? totalAttempts / totalSlots : 0;
+  const sessionPct = totalSlots > 0 ? (REQUIRED_MAKES / sessionAvg * 100) : 0;
+  return { bySpoke, totalAttempts, totalSlots, sessionAvg, sessionPct };
+}
+
+function renderWagonStats() {
+  const sessions = getViewSessions();
+  const s = computeWagonStats(sessions);
+
+  const sessionSelect = document.getElementById('session-select');
+  sessionSelect.style.display = statsView === 'session' ? '' : 'none';
+
+  const overviewTitle = document.getElementById('stats-overview-title');
+  overviewTitle.textContent = statsView === 'session' ? 'Session Overview' : statsView === 'trending' ? `Trending — Last ${sessions.length}` : `History — ${sessions.length} Sessions`;
+
+  const sg = document.getElementById('stats-session-grid');
+  const isMulti = statsView !== 'session';
+  let best = null, worst = null;
+  for (let i = 0; i < s.bySpoke.length; i++) {
+    const d = s.bySpoke[i];
+    if (d.count > 0) {
+      const avg = d.sum / d.count;
+      if (!best || avg < best.avg) best = { spoke: i, avg };
+      if (!worst || avg > worst.avg) worst = { spoke: i, avg };
+    }
+  }
+  sg.innerHTML = `
+    <div class="stats-item"><div class="stats-item-value">${s.sessionPct.toFixed(0)}%</div><div class="stats-item-label">Hit Rate</div></div>
+    <div class="stats-item"><div class="stats-item-value">${s.sessionAvg.toFixed(1)}</div><div class="stats-item-label">Avg Attempts</div></div>
+    <div class="stats-item"><div class="stats-item-value">${s.totalSlots}/12</div><div class="stats-item-label">${isMulti ? 'Spokes Seen' : 'Filled'}</div></div>
+    <div class="stats-item"><div class="stats-item-value">${best ? WAGON_SPOKES[best.spoke].label : '-'}</div><div class="stats-item-label">Best (${best ? best.avg.toFixed(1) : '-'})</div></div>
+    <div class="stats-item"><div class="stats-item-value">${worst ? WAGON_SPOKES[worst.spoke].label : '-'}</div><div class="stats-item-label">Worst (${worst ? worst.avg.toFixed(1) : '-'})</div></div>
+    <div class="stats-item"><div class="stats-item-value">${isMulti ? sessions.length : s.totalAttempts}</div><div class="stats-item-label">${isMulti ? 'Sessions' : 'Total Attempts'}</div></div>
+  `;
+
+  // Per-spoke breakdown → use type grid
+  const tg = document.getElementById('stats-type-grid');
+  let spokeHtml = '';
+  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+    const d = s.bySpoke[i];
+    const avg = d.count > 0 ? d.sum / d.count : 0;
+    const pct = avg > 0 ? hitPct(avg) : 0;
+    spokeHtml += `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${WAGON_SPOKES[i].label} (${d.count})</div></div>`;
+  }
+  tg.innerHTML = spokeHtml;
+  tg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'Per Spoke';
+
+  // Hide irrelevant sections
+  const ag = document.getElementById('stats-angle-grid');
+  if (ag) ag.closest('.stats-section').style.display = 'none';
+  const cg = document.getElementById('stats-cutdir-grid');
+  if (cg) cg.closest('.stats-section').style.display = 'none';
+  const dg = document.getElementById('stats-distance-grid');
+  dg.closest('.stats-section').style.display = 'none';
+  const rg = document.getElementById('stats-rail-grid');
+  rg.closest('.stats-section').style.display = 'none';
+  document.getElementById('stats-ball-list').closest('.stats-section').style.display = 'none';
+  document.getElementById('stats-trends-section').style.display = 'none';
 }
 
 // Session switcher for stats page

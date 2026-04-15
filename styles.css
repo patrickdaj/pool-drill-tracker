@@ -108,7 +108,7 @@ body {
   align-items: center;
   justify-content: center;
   flex: 1;
-  padding: 40px 16px;
+  padding: 0;
 }
 
 .coming-soon {
@@ -734,7 +734,146 @@ body {
   cursor: pointer;
 }
 
-/* ===== Wide Screen Layout ===== */
+/* ===== Drill Layout (Mighty X / Wagon Wheel) ===== */
+
+.drill-layout {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.drill-left {
+  width: 100%;
+}
+
+.drill-left .table-container {
+  width: 100%;
+  max-width: 440px;
+  padding: 4px 12px;
+}
+
+.drill-info {
+  width: 100%;
+  max-width: 440px;
+  text-align: center;
+  padding: 2px 16px 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  min-height: 1.4em;
+}
+
+.drill-right {
+  width: 100%;
+}
+
+.drill-selector {
+  width: 100%;
+  max-width: 440px;
+  padding: 4px 16px;
+}
+
+.drill-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.drill-toggle-btn {
+  flex: 1;
+  padding: 7px 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  text-transform: capitalize;
+}
+
+.drill-toggle-btn.active {
+  background: rgba(110,231,160,0.12);
+  color: #6ee7a0;
+  border-color: rgba(110,231,160,0.25);
+}
+
+.drill-toggle-btn.done {
+  color: rgba(110,231,160,0.5);
+}
+
+.drill-toggle-btn.done::after {
+  content: ' ✓';
+  font-size: 0.6rem;
+}
+
+.drill-toggle-btn.done.active::after {
+  content: '';
+}
+
+.mx-shot-btn.active {
+  background: color-mix(in srgb, var(--shot-color, #6ee7a0) 15%, transparent);
+  color: var(--shot-color, #6ee7a0);
+  border-color: color-mix(in srgb, var(--shot-color, #6ee7a0) 30%, transparent);
+}
+
+/* Wagon spoke grid */
+.wagon-spoke-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.wagon-spoke-btn {
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.4);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.wagon-spoke-btn.selected {
+  background: rgba(110,231,160,0.12);
+  color: #6ee7a0;
+  border-color: rgba(110,231,160,0.3);
+  box-shadow: 0 0 8px rgba(110,231,160,0.2);
+}
+
+.wagon-spoke-btn.done {
+  background: rgba(110,231,160,0.08);
+  color: rgba(110,231,160,0.5);
+  border-color: rgba(110,231,160,0.15);
+}
+
+.wagon-spoke-btn.done.selected {
+  color: #6ee7a0;
+}
+
+/* Drill progress bar (shared by MX/WW) */
+.drill-progress {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+}
+
+.cycle-dot.current {
+  border: 1.5px solid #fff;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+/* ===== Main Positions Layout ===== */
 
 /* Mobile: main-layout is transparent, everything behaves as before */
 .main-layout {
@@ -864,6 +1003,89 @@ body {
     padding: 4px 8px;
     font-size: 14px;
     border-radius: 6px;
+  }
+
+  /* Drill layout (MX / Wagon) wide screen */
+  .other-drill-content {
+    max-width: 960px;
+    padding: 0 24px;
+  }
+
+  .drill-layout {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  .drill-left {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .drill-left .table-container {
+    max-width: none;
+    padding: 4px 0;
+  }
+
+  .drill-left .drill-info {
+    max-width: none;
+    padding: 2px 0 4px;
+  }
+
+  .drill-right {
+    flex: 0 0 320px;
+    max-width: 320px;
+  }
+
+  .drill-right .drill-selector {
+    max-width: none;
+    padding: 4px 0;
+  }
+
+  .drill-right .input-row {
+    max-width: none;
+    padding: 4px 0;
+  }
+
+  .drill-right .attempt-display {
+    font-size: 2rem;
+    min-height: 44px;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .drill-right .numpad {
+    max-width: none;
+    padding: 4px 0;
+    gap: 3px;
+  }
+
+  .drill-right .numpad-btn {
+    height: 30px;
+    font-size: 1rem;
+    border-radius: 8px;
+  }
+
+  .drill-right .num-save {
+    font-size: 0.8rem;
+  }
+
+  .drill-right .note-row {
+    max-width: none;
+    padding: 2px 0 0;
+  }
+
+  .drill-right .note-input {
+    padding: 4px 8px;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+
+  .drill-progress {
+    max-width: 960px;
+    width: 100%;
+    padding: 6px 0;
   }
 }
 
