@@ -454,7 +454,7 @@ function renderMxStats() {
   sg.innerHTML = `
     <div class="stats-item"><div class="stats-item-value">${s.sessionPct.toFixed(0)}%</div><div class="stats-item-label">Hit Rate</div></div>
     <div class="stats-item"><div class="stats-item-value">${s.sessionAvg.toFixed(1)}</div><div class="stats-item-label">Avg Attempts</div></div>
-    <div class="stats-item"><div class="stats-item-value">${s.totalSlots}/24</div><div class="stats-item-label">${isMulti ? 'Entries Seen' : 'Filled'}</div></div>
+    <div class="stats-item"><div class="stats-item-value">${s.totalSlots}/${MX_TOTAL}</div><div class="stats-item-label">${isMulti ? 'Entries Seen' : 'Filled'}</div></div>
     <div class="stats-item"><div class="stats-item-value">${isMulti ? sessions.length : s.totalAttempts}</div><div class="stats-item-label">${isMulti ? 'Sessions' : 'Total Attempts'}</div></div>
   `;
 
