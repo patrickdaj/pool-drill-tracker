@@ -839,13 +839,7 @@ function renderTableDiagram() {
 
     svg += `<circle cx="${x}" cy="${y}" r="${isSelected ? 13 : 10}" fill="${markerFill}" stroke="${isSelected ? '#fff' : 'none'}" stroke-width="${isSelected ? 2 : 0}" data-cue="${key}" class="cue-marker" style="cursor:pointer"/>`;
 
-    // Note indicator
-    const hasNote = isDual
-      ? ((getEntry(state.selectedBall, key, 'L') || {}).note || (getEntry(state.selectedBall, key, 'R') || {}).note)
-      : (hasData && getEntry(state.selectedBall, key) && getEntry(state.selectedBall, key).note);
-    if (hasNote && !isSelected) {
-      svg += `<text x="${x + 9}" y="${y - 7}" text-anchor="middle" font-size="7" style="pointer-events:none">📝</text>`;
-    }
+    // Note indicator removed
 
     if (hasData && !isSelected) {
       svg += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-size="9" font-weight="700" font-family="Inter,system-ui,sans-serif" fill="#0f0f1a" data-cue="${key}" style="cursor:pointer;pointer-events:none">${displayAttempts}</text>`;
@@ -993,11 +987,7 @@ function renderDisplay() {
     hint.className = 'saved-hint';
   }
 
-  // Note input
-  const noteInput = document.getElementById('note-input');
-  if (noteInput) {
-    noteInput.value = (entry && entry.note) || '';
-  }
+  // Note input removed
 }
 
 function applyShotType() {
@@ -1600,25 +1590,12 @@ function renderMightyX() {
   html += `<button class="numpad-btn num-digit" data-digit="0">0</button>`;
   html += `<button class="numpad-btn num-save" data-action="save">Save</button>`;
   html += `</div>`;
-
-  // Note
-  html += `<div class="note-row"><input type="text" class="note-input" id="drill-note-input" placeholder="Note…" maxlength="80" autocomplete="off" value="${escAttr((entry && entry.note) || '')}"></div>`;
   html += `</div>`; // drill-right
 
-  // Cycle progress dots
-  html += `<div class="drill-progress">`;
-  html += `<div class="cycle-dots">`;
-  for (const side of MX_SIDES) {
-    for (const level of MX_LEVELS) {
-      for (const shot of MX_SHOTS) {
-        const k = mxKey(side, level, shot);
-        const isDone = isMxEntryComplete(k);
-        const isCurr = k === currentKey;
-        html += `<span class="cycle-dot ${isDone ? 'done' : ''} ${isCurr ? 'current' : ''}" title="${side} L${level} ${shot}">${shot[0].toUpperCase()}</span>`;
-      }
-    }
-  }
-  html += `</div>`;
+  // Compact cycle progress bar (60 entries is too many for dots)
+  const pct = MX_TOTAL > 0 ? (done / MX_TOTAL * 100) : 0;
+  html += `<div class="drill-progress mx-progress">`;
+  html += `<div class="mx-progress-bar"><div class="mx-progress-fill" style="width:${pct}%"></div></div>`;
   html += `<div class="cycle-count">${done} / ${MX_TOTAL}</div>`;
   html += `</div>`;
 
@@ -1736,12 +1713,9 @@ function renderWagonWheel() {
   html += `<button class="numpad-btn num-digit" data-digit="0">0</button>`;
   html += `<button class="numpad-btn num-save" data-action="save">Save</button>`;
   html += `</div>`;
-
-  // Note
-  html += `<div class="note-row"><input type="text" class="note-input" id="drill-note-input" placeholder="Note…" maxlength="80" autocomplete="off" value="${escAttr((entry && entry.note) || '')}"></div>`;
   html += `</div>`; // drill-right
 
-  // Cycle progress dots
+  // Cycle progress dots (12 spokes, fits nicely)
   html += `<div class="drill-progress">`;
   html += `<div class="cycle-dots">`;
   for (let i = 0; i < WAGON_SPOKES.length; i++) {
@@ -1848,16 +1822,6 @@ function attachDrillHandlers(type) {
     if (type === 'mx') pressSaveMx();
     else if (type === 'wagon') pressSaveWagon();
   });
-
-  // Note
-  const noteInput = document.getElementById('drill-note-input');
-  if (noteInput) {
-    noteInput.addEventListener('change', () => {
-      if (type === 'mx') saveMxNote(mxCurrentKey(), noteInput.value);
-      else if (type === 'wagon') saveWagonNote(state.wagonSpoke, noteInput.value);
-    });
-    noteInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') noteInput.blur(); });
-  }
 }
 
 function pressSaveMx() {
@@ -1942,20 +1906,6 @@ function init() {
   });
   document.getElementById('btn-backspace').addEventListener('click', pressBackspace);
   document.getElementById('btn-save').addEventListener('click', pressSave);
-
-  // Note input — save on blur / Enter
-  const noteInput = document.getElementById('note-input');
-  function commitNote() {
-    const isDual = isDualPosition(state.selectedBall, state.selectedPosition);
-    const dir = isDual ? state.direction : null;
-    saveNote(state.selectedBall, state.selectedPosition, noteInput.value, dir);
-    renderTableDiagram();
-  }
-  noteInput.addEventListener('change', commitNote);
-  noteInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { noteInput.blur(); }
-  });
-
 
 
   // Direction toggle (L/R for dual positions)

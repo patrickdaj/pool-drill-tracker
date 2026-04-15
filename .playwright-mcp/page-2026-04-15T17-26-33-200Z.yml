@@ -1,0 +1,91 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Pool Drill Tracker" [level=1] [ref=e3]
+    - generic [ref=e4]:
+      - link "Stats" [ref=e5] [cursor=pointer]:
+        - /url: stats.html
+      - button "Export" [ref=e6] [cursor=pointer]
+  - generic [ref=e7]:
+    - button "🎯 Positions" [ref=e255] [cursor=pointer]
+    - button "✖️ Mighty X" [ref=e256] [cursor=pointer]
+    - button "☸️ Wagon Wheel" [ref=e257] [cursor=pointer]
+  - generic [ref=e11]:
+    - combobox "Select session" [ref=e12]:
+      - option "Apr 15, 2026, 10:02 AM" [selected]
+    - button "New Cycle" [ref=e13] [cursor=pointer]
+    - button "Reset" [ref=e14] [cursor=pointer]
+    - button "Delete" [ref=e15] [cursor=pointer]
+    - button "Reset All" [ref=e16] [cursor=pointer]
+  - generic [ref=e258]:
+    - generic [ref=e259]:
+      - img [ref=e261]:
+        - generic: ▶
+        - generic: ▶
+        - generic: L1
+        - generic: L2
+        - generic: L3
+      - generic [ref=e307]: Right → · Level 1 · Draw
+    - generic [ref=e308]:
+      - generic [ref=e309]:
+        - generic [ref=e310]: Side
+        - generic [ref=e311]:
+          - button "← Left" [ref=e312] [cursor=pointer]
+          - button "Right →" [ref=e313] [cursor=pointer]
+      - generic [ref=e314]:
+        - generic [ref=e315]: Distance Level
+        - generic [ref=e316]:
+          - button "1◆" [ref=e317] [cursor=pointer]
+          - button "2◆" [ref=e318] [cursor=pointer]
+          - button "3◆" [ref=e319] [cursor=pointer]
+      - generic [ref=e320]:
+        - generic [ref=e321]: Shot Type
+        - generic [ref=e322]:
+          - button "Follow" [ref=e323] [cursor=pointer]
+          - button "Draw" [ref=e324] [cursor=pointer]
+          - button "Stop" [ref=e325] [cursor=pointer]
+      - generic [ref=e326]:
+        - generic [ref=e328]: "2"
+        - generic [ref=e329]:
+          - generic [ref=e330]:
+            - generic [ref=e331]: Entry
+            - generic [ref=e332]: —
+            - generic [ref=e333]: Draw
+          - generic [ref=e334]:
+            - generic [ref=e335]: Cycle
+            - generic [ref=e336]: "1"
+            - generic [ref=e337]: 1/18
+      - generic [ref=e338]:
+        - button "1" [ref=e339] [cursor=pointer]
+        - button "2" [ref=e340] [cursor=pointer]
+        - button "3" [ref=e341] [cursor=pointer]
+        - button "4" [ref=e342] [cursor=pointer]
+        - button "5" [ref=e343] [cursor=pointer]
+        - button "6" [ref=e344] [cursor=pointer]
+        - button "7" [ref=e345] [cursor=pointer]
+        - button "8" [ref=e346] [cursor=pointer]
+        - button "9" [ref=e347] [cursor=pointer]
+        - button "⌫" [ref=e348] [cursor=pointer]
+        - button "0" [ref=e349] [cursor=pointer]
+        - button "Save" [ref=e350] [cursor=pointer]
+      - textbox "Note…" [ref=e352]
+    - generic [ref=e353]:
+      - generic [ref=e354]:
+        - generic "left L1 follow" [ref=e355]: F
+        - generic "left L1 draw" [ref=e356]: D
+        - generic "left L1 stop" [ref=e357]: S
+        - generic "left L2 follow" [ref=e358]: F
+        - generic "left L2 draw" [ref=e359]: D
+        - generic "left L2 stop" [ref=e360]: S
+        - generic "left L3 follow" [ref=e361]: F
+        - generic "left L3 draw" [ref=e362]: D
+        - generic "left L3 stop" [ref=e363]: S
+        - generic "right L1 follow" [ref=e364]: F
+        - generic "right L1 draw" [ref=e365]: D
+        - generic "right L1 stop" [ref=e366]: S
+        - generic "right L2 follow" [ref=e367]: F
+        - generic "right L2 draw" [ref=e368]: D
+        - generic "right L2 stop" [ref=e369]: S
+        - generic "right L3 follow" [ref=e370]: F
+        - generic "right L3 draw" [ref=e371]: D
+        - generic "right L3 stop" [ref=e372]: S
+      - generic [ref=e373]: 1 / 18

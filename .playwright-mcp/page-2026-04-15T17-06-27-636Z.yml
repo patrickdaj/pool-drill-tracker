@@ -1,0 +1,96 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Pool Drill Tracker" [level=1] [ref=e3]
+    - generic [ref=e4]:
+      - link "Stats" [ref=e5] [cursor=pointer]:
+        - /url: stats.html
+      - button "Export" [ref=e6] [cursor=pointer]
+  - generic [ref=e7]:
+    - button "🎯 Positions" [ref=e668] [cursor=pointer]
+    - button "✖️ Mighty X" [ref=e669] [cursor=pointer]
+    - button "☸️ Wagon Wheel" [ref=e670] [cursor=pointer]
+  - generic [ref=e11]:
+    - combobox "Select session" [ref=e12]:
+      - option "Apr 15, 2026, 10:03 AM" [selected]
+    - button "New Cycle" [ref=e13] [cursor=pointer]
+    - button "Reset" [ref=e14] [cursor=pointer]
+    - button "Delete" [ref=e15] [cursor=pointer]
+    - button "Reset All" [ref=e16] [cursor=pointer]
+  - generic [ref=e671]:
+    - generic [ref=e672]:
+      - img [ref=e674]:
+        - generic: "4"
+        - generic: "5"
+        - generic: "3"
+        - generic: ▶
+        - generic: "5"
+        - generic: "6"
+        - generic: "7"
+        - generic: "8"
+        - generic: "9"
+        - generic: "10"
+        - generic: "11"
+        - generic: "12"
+      - generic [ref=e708]:
+        - text: Spoke
+        - strong [ref=e709]: "4"
+        - text: · Top 7
+    - generic [ref=e710]:
+      - generic [ref=e711]:
+        - generic [ref=e712]: Spoke
+        - generic [ref=e713]:
+          - button "✓" [ref=e714] [cursor=pointer]
+          - button "✓" [ref=e715] [cursor=pointer]
+          - button "3" [ref=e716] [cursor=pointer]
+          - button "4" [ref=e717] [cursor=pointer]
+          - button "5" [ref=e718] [cursor=pointer]
+          - button "6" [ref=e719] [cursor=pointer]
+          - button "7" [ref=e720] [cursor=pointer]
+          - button "8" [ref=e721] [cursor=pointer]
+          - button "9" [ref=e722] [cursor=pointer]
+          - button "10" [ref=e723] [cursor=pointer]
+          - button "11" [ref=e724] [cursor=pointer]
+          - button "12" [ref=e725] [cursor=pointer]
+      - generic [ref=e727]:
+        - button "Sequential" [ref=e728] [cursor=pointer]
+        - button "🎲 Random" [ref=e729] [cursor=pointer]
+      - generic [ref=e730]:
+        - generic [ref=e732]: "2"
+        - generic [ref=e733]:
+          - generic [ref=e734]:
+            - generic [ref=e735]: Spoke 4
+            - generic [ref=e736]: —
+            - generic [ref=e737]: Top 7
+          - generic [ref=e738]:
+            - generic [ref=e739]: Cycle
+            - generic [ref=e740]: "2"
+            - generic [ref=e741]: 2/12
+      - generic [ref=e742]:
+        - button "1" [ref=e743] [cursor=pointer]
+        - button "2" [ref=e744] [cursor=pointer]
+        - button "3" [ref=e745] [cursor=pointer]
+        - button "4" [ref=e746] [cursor=pointer]
+        - button "5" [ref=e747] [cursor=pointer]
+        - button "6" [ref=e748] [cursor=pointer]
+        - button "7" [ref=e749] [cursor=pointer]
+        - button "8" [ref=e750] [cursor=pointer]
+        - button "9" [ref=e751] [cursor=pointer]
+        - button "⌫" [ref=e752] [cursor=pointer]
+        - button "0" [ref=e753] [cursor=pointer]
+        - button "Save" [ref=e754] [cursor=pointer]
+      - textbox "Note…" [ref=e756]
+    - generic [ref=e757]:
+      - generic [ref=e758]:
+        - generic [ref=e759]: "1"
+        - generic [ref=e760]: "2"
+        - generic [ref=e761]: "3"
+        - generic [ref=e762]: "4"
+        - generic [ref=e763]: "5"
+        - generic [ref=e764]: "6"
+        - generic [ref=e765]: "7"
+        - generic [ref=e766]: "8"
+        - generic [ref=e767]: "9"
+        - generic [ref=e768]: "10"
+        - generic [ref=e769]: "11"
+        - generic [ref=e770]: "12"
+      - generic [ref=e771]: 2 / 12

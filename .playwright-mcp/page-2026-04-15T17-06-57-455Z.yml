@@ -1,0 +1,68 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "← Stats" [level=1] [ref=e3]:
+      - link "←" [ref=e4] [cursor=pointer]:
+        - /url: index.html
+      - text: Stats
+    - combobox "Select session" [ref=e6]:
+      - option "Apr 15, 2026, 10:02 AM" [selected]
+  - generic [ref=e7]:
+    - button "🎯 Positions" [ref=e208] [cursor=pointer]
+    - button "✖️ Mighty X" [ref=e209] [cursor=pointer]
+    - button "☸️ Wagon Wheel" [ref=e210] [cursor=pointer]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - button "Session" [ref=e13] [cursor=pointer]
+      - button "Trending" [ref=e14] [cursor=pointer]
+      - button "History" [ref=e15] [cursor=pointer]
+    - generic [ref=e16]:
+      - generic [ref=e17]: Session Overview
+      - generic [ref=e18]:
+        - generic [ref=e211]:
+          - generic [ref=e212]: 67%
+          - generic [ref=e213]: Hit Rate
+        - generic [ref=e214]:
+          - generic [ref=e215]: "3.0"
+          - generic [ref=e216]: Avg Attempts
+        - generic [ref=e217]:
+          - generic [ref=e218]: 1/24
+          - generic [ref=e219]: Filled
+        - generic [ref=e220]:
+          - generic [ref=e221]: "3"
+          - generic [ref=e222]: Total Attempts
+    - generic [ref=e37]:
+      - generic [ref=e38]: By Side
+      - generic [ref=e39]:
+        - generic [ref=e223]:
+          - generic [ref=e224]: 67%
+          - generic [ref=e225]: ← Left (1)
+        - generic [ref=e226]:
+          - generic [ref=e227]: "-"
+          - generic [ref=e228]: Right → (0)
+    - generic [ref=e49]:
+      - generic [ref=e50]: By Shot Type
+      - generic [ref=e51]:
+        - generic [ref=e229]:
+          - generic [ref=e230]: 67%
+          - generic [ref=e231]: Follow (1)
+        - generic [ref=e232]:
+          - generic [ref=e233]: "-"
+          - generic [ref=e234]: Draw (0)
+        - generic [ref=e235]:
+          - generic [ref=e236]: "-"
+          - generic [ref=e237]: Stop (0)
+    - generic [ref=e82]:
+      - generic [ref=e83]: By Distance Level
+      - generic [ref=e84]:
+        - generic [ref=e238]:
+          - generic [ref=e239]: 67%
+          - generic [ref=e240]: Level 1 (1)
+        - generic [ref=e241]:
+          - generic [ref=e242]: "-"
+          - generic [ref=e243]: Level 2 (0)
+        - generic [ref=e244]:
+          - generic [ref=e245]: "-"
+          - generic [ref=e246]: Level 3 (0)
+        - generic [ref=e247]:
+          - generic [ref=e248]: "-"
+          - generic [ref=e249]: Level 4 (0)
