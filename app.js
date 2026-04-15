@@ -333,21 +333,18 @@ const WW_TOTAL = WW_POSITIONS.length; // 23
 function wwKey(pos) { return `ww-${pos.col}-${pos.row}`; }
 
 // Shot setup: OB always at center one diamond from TS pocket (4,3)
-// CB ball-in-hand: slightly left for right-side, slightly right for left-side
+// OB always pockets into TS (top side) pocket. Only CB position changes.
 function wwShotSetup(posIdx) {
-  const pos = WW_POSITIONS[posIdx];
   const isRight = posIdx <= 11;
-  // Target: right-half shoots at TS, left-half shoots at BS
-  const target = isRight ? { col: 4, row: 4 } : { col: 4, row: 0 };
-  // OB: always center table, one diamond below TS pocket
+  // Target is always TS pocket
+  const target = { col: 4, row: 4 };
+  // OB: center table, one diamond from TS pocket
   const ob = { col: 4, row: 3 };
-  // CB: near center; pos 12 (BS pocket) → directly between OB and pocket
+  // CB: near center; pos 12 (BS pocket) → directly between OB and BS pocket
   let cb;
   if (posIdx === 11) {
-    // Position 12 = BS pocket: CB on the line between OB(4,3) and pocket(4,0)
     cb = { col: 4, row: 1.5 };
   } else {
-    // Right side → CB slightly left; Left side → CB slightly right
     cb = { col: isRight ? 3.5 : 4.5, row: 2 };
   }
   return { target, ob, cb };
@@ -1775,7 +1772,7 @@ function renderWagonWheel() {
   const currentPos = WW_POSITIONS[state.wagonSpoke];
   const { done, total } = getWagonCycleProgress();
   const setup = wwShotSetup(state.wagonSpoke);
-  const targetLabel = (setup.target.col === 4 && setup.target.row === 4) ? 'Top Side' : 'Bottom Side';
+  const targetLabel = 'Top Side';
 
   let html = `<div class="drill-layout">`;
 
