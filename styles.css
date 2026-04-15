@@ -753,12 +753,7 @@ body {
   padding: 2px 12px;
 }
 
-.drill-left .table-container .table-svg {
-  max-height: 180px;
-  width: auto;
-  display: block;
-  margin: 0 auto;
-}
+
 
 .drill-info {
   width: 100%;
@@ -1069,9 +1064,7 @@ body {
     padding: 4px 0;
   }
 
-  .drill-left .table-container .table-svg {
-    max-height: none;
-  }
+
 
   .drill-left .drill-info {
     max-width: none;
