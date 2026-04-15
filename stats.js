@@ -566,7 +566,7 @@ function renderWagonStats() {
   sg.innerHTML = `
     <div class="stats-item"><div class="stats-item-value">${s.sessionPct.toFixed(0)}%</div><div class="stats-item-label">Hit Rate</div></div>
     <div class="stats-item"><div class="stats-item-value">${s.sessionAvg.toFixed(1)}</div><div class="stats-item-label">Avg Attempts</div></div>
-    <div class="stats-item"><div class="stats-item-value">${filledCount}/24</div><div class="stats-item-label">${isMulti ? 'Positions Seen' : 'Filled'}</div></div>
+    <div class="stats-item"><div class="stats-item-value">${filledCount}/${WW_ALL_DIAMONDS.length}</div><div class="stats-item-label">${isMulti ? 'Positions Seen' : 'Filled'}</div></div>
     <div class="stats-item"><div class="stats-item-value">${best ? wwStatLabel(best.pos) : '-'}</div><div class="stats-item-label">Best (${best ? best.avg.toFixed(1) : '-'})</div></div>
     <div class="stats-item"><div class="stats-item-value">${worst ? wwStatLabel(worst.pos) : '-'}</div><div class="stats-item-label">Worst (${worst ? worst.avg.toFixed(1) : '-'})</div></div>
     <div class="stats-item"><div class="stats-item-value">${isMulti ? sessions.length : s.totalAttempts}</div><div class="stats-item-label">${isMulti ? 'Sessions' : 'Total Attempts'}</div></div>

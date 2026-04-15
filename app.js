@@ -311,49 +311,46 @@ function mxKey(side, level, shot) { return `${side}-${level}-${shot}`; }
 
 // ── Wagon Wheel Constants ───────────────────────────
 
-// All 24 diamond positions clockwise (pockets included as diamonds)
+// 23 diamond positions clockwise (pockets included; TS pocket excluded — OB lives there)
 const WW_POSITIONS = [
   { col: 5, row: 4 }, { col: 6, row: 4 }, { col: 7, row: 4 },  // top rail right
   { col: 8, row: 4 },                                            // TR pocket
   { col: 8, row: 3 }, { col: 8, row: 2 }, { col: 8, row: 1 },  // right rail
   { col: 8, row: 0 },                                            // BR pocket
   { col: 7, row: 0 }, { col: 6, row: 0 }, { col: 5, row: 0 },  // bottom rail right
-  { col: 4, row: 0 },                                            // BS pocket
+  { col: 4, row: 0 },                                            // BS pocket (pos 12)
   { col: 3, row: 0 }, { col: 2, row: 0 }, { col: 1, row: 0 },  // bottom rail left
   { col: 0, row: 0 },                                            // BL pocket
   { col: 0, row: 1 }, { col: 0, row: 2 }, { col: 0, row: 3 },  // left rail
   { col: 0, row: 4 },                                            // TL pocket
   { col: 1, row: 4 }, { col: 2, row: 4 }, { col: 3, row: 4 },  // top rail left
-  { col: 4, row: 4 },                                            // TS pocket
 ];
 // Back-compat alias for stats.js
 const WW_ALL_DIAMONDS = WW_POSITIONS;
 
-const WW_TOTAL = WW_POSITIONS.length; // 24
+const WW_TOTAL = WW_POSITIONS.length; // 23
 
 function wwKey(pos) { return `ww-${pos.col}-${pos.row}`; }
 
-// Shot setup: target pocket, OB (one diamond from pocket on rail), CB (near center)
+// Shot setup: OB always at center one diamond from TS pocket (4,3)
+// CB ball-in-hand: slightly left for right-side, slightly right for left-side
 function wwShotSetup(posIdx) {
   const pos = WW_POSITIONS[posIdx];
-  // Right half (idx 0-11) → target TS pocket; Left half (idx 12-23) → target BS pocket
-  // Exception: if position IS the target pocket, use the other side pocket
   const isRight = posIdx <= 11;
-  let target = isRight ? { col: 4, row: 4 } : { col: 4, row: 0 };
-  if (pos.col === target.col && pos.row === target.row) {
-    target = isRight ? { col: 4, row: 0 } : { col: 4, row: 4 };
+  // Target: right-half shoots at TS, left-half shoots at BS
+  const target = isRight ? { col: 4, row: 4 } : { col: 4, row: 0 };
+  // OB: always center table, one diamond below TS pocket
+  const ob = { col: 4, row: 3 };
+  // CB: near center; pos 12 (BS pocket) → directly between OB and pocket
+  let cb;
+  if (posIdx === 11) {
+    // Position 12 = BS pocket: CB on the line between OB(4,3) and pocket(4,0)
+    cb = { col: 4, row: 1.5 };
+  } else {
+    // Right side → CB slightly left; Left side → CB slightly right
+    cb = { col: isRight ? 3.5 : 4.5, row: 2 };
   }
-  // OB: one diamond from target along the rail toward position side
-  let obCol = isRight ? target.col + 1 : target.col - 1;
-  let obRow = target.row;
-  // If OB overlaps the position itself, put it on the other side
-  if (obCol === pos.col && obRow === pos.row) {
-    obCol = isRight ? target.col - 1 : target.col + 1;
-  }
-  // CB: near center, slight offset to create angle toward OB
-  const cbOffX = (obCol > target.col) ? 0.7 : -0.7;
-  const cbRow = target.row === 4 ? 2.3 : 1.7;
-  return { target, ob: { col: obCol, row: obRow }, cb: { col: target.col + cbOffX, row: cbRow } };
+  return { target, ob, cb };
 }
 
 // ── State ───────────────────────────────────────────
