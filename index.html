@@ -31,10 +31,16 @@
   <!-- Session Bar -->
   <div class="session-bar">
     <select id="session-select" aria-label="Select session"></select>
-    <button id="btn-new-session">+ New</button>
+    <button id="btn-new-session">New Cycle</button>
     <button id="btn-reset">Reset</button>
     <button id="btn-delete-session">Delete</button>
     <button id="btn-reset-all">Reset All</button>
+  </div>
+
+  <!-- Cycle Progress -->
+  <div class="cycle-bar" id="cycle-bar">
+    <div class="cycle-dots" id="cycle-dots"></div>
+    <div class="cycle-count" id="cycle-count">0 / 12</div>
   </div>
 
   <div class="main-layout">
@@ -104,6 +110,17 @@
 
     </div><!-- .main-right -->
   </div><!-- .main-layout -->
+
+  <!-- Cycle Complete Modal -->
+  <div class="cycle-modal-backdrop" id="cycle-modal-backdrop" style="display:none"></div>
+  <div class="cycle-modal" id="cycle-modal" style="display:none">
+    <div class="cycle-modal-icon">&#127921;</div>
+    <h2 class="cycle-modal-title">Cycle Complete!</h2>
+    <p class="cycle-modal-text">All 12 drills finished.</p>
+    <p class="cycle-modal-stats" id="cycle-modal-stats"></p>
+    <button class="cycle-modal-btn" id="btn-new-cycle">Start New Cycle</button>
+    <button class="cycle-modal-dismiss" id="btn-dismiss-cycle">Review Results</button>
+  </div>
 
   <!-- Toast -->
   <div class="toast" id="toast"></div>

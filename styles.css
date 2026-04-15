@@ -538,6 +538,136 @@ body {
   opacity: 1;
 }
 
+/* ===== Cycle Progress Bar ===== */
+.cycle-bar {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px 6px;
+}
+
+.cycle-dots {
+  display: flex;
+  gap: 3px;
+  flex: 1;
+}
+
+.cycle-dot {
+  flex: 1;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  font-weight: 700;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.25);
+  transition: background 0.2s, color 0.2s;
+}
+
+.cycle-dot.done {
+  background: rgba(110,231,160,0.2);
+  color: #6ee7a0;
+}
+
+.cycle-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Ball Pill Completed ===== */
+.ball-pill.completed {
+  opacity: 0.5;
+}
+
+.ball-pill.completed.selected {
+  opacity: 1;
+}
+
+/* ===== Cycle Complete Modal ===== */
+.cycle-modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+}
+
+.cycle-modal {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 201;
+  background: #1a1a2e;
+  border: 1px solid rgba(110,231,160,0.3);
+  border-radius: 20px;
+  padding: 32px 28px;
+  text-align: center;
+  width: 90%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.cycle-modal-icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.cycle-modal-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #6ee7a0;
+  margin: 0;
+}
+
+.cycle-modal-text {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.6);
+  margin: 0;
+}
+
+.cycle-modal-stats {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.35);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.cycle-modal-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #111;
+  background: #6ee7a0;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.cycle-modal-dismiss {
+  width: 100%;
+  padding: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: rgba(255,255,255,0.5);
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
 /* ===== Wide Screen Layout ===== */
 
 /* Mobile: main-layout is transparent, everything behaves as before */
@@ -566,6 +696,11 @@ body {
   .session-bar {
     max-width: 960px;
     padding: 2px 24px 6px;
+  }
+
+  .cycle-bar {
+    max-width: 960px;
+    padding: 4px 24px 6px;
   }
 
   .main-layout {

@@ -440,6 +440,28 @@ function getTotalPositionCount() {
   return count;
 }
 
+// ── Cycle Progress ──────────────────────────────────
+
+function isBallComplete(ballNum) {
+  const positions = getCuePositions(ballNum);
+  return positions.every(p => isPositionComplete(ballNum, coordKey(p)));
+}
+
+function isCycleComplete() {
+  for (let b = 1; b <= 12; b++) {
+    if (!isBallComplete(b)) return false;
+  }
+  return true;
+}
+
+function getCycleProgress() {
+  let done = 0;
+  for (let b = 1; b <= 12; b++) {
+    if (isBallComplete(b)) done++;
+  }
+  return { done, total: 12 };
+}
+
 // ── SVG Table Diagram ───────────────────────────────
 
 function renderTableDiagram() {
@@ -681,9 +703,13 @@ function renderBallSelector() {
   row.innerHTML = '';
   for (let b = 1; b <= 12; b++) {
     const btn = document.createElement('button');
-    btn.className = `ball-pill ball-${b}${b === state.selectedBall ? ' selected' : ''}`;
-    btn.textContent = b;
-    btn.setAttribute('aria-label', `Ball ${b}`);
+    const complete = isBallComplete(b);
+    let cls = `ball-pill ball-${b}`;
+    if (b === state.selectedBall) cls += ' selected';
+    if (complete) cls += ' completed';
+    btn.className = cls;
+    btn.innerHTML = complete ? '&#10003;' : String(b);
+    btn.setAttribute('aria-label', `Ball ${b}${complete ? ' (complete)' : ''}`);
     btn.addEventListener('click', () => selectBall(b));
     row.appendChild(btn);
   }
@@ -789,6 +815,52 @@ function renderSessionSelector() {
   }
 }
 
+function renderCycleProgress() {
+  const dotsEl = document.getElementById('cycle-dots');
+  const countEl = document.getElementById('cycle-count');
+  if (!dotsEl || !countEl) return;
+  const { done } = getCycleProgress();
+  dotsEl.innerHTML = '';
+  for (let b = 1; b <= 12; b++) {
+    const dot = document.createElement('span');
+    dot.className = 'cycle-dot' + (isBallComplete(b) ? ' done' : '');
+    dot.textContent = b;
+    dotsEl.appendChild(dot);
+  }
+  countEl.textContent = `${done} / 12`;
+}
+
+function showCycleComplete() {
+  const statsEl = document.getElementById('cycle-modal-stats');
+  const total = getSessionTotal();
+  const filled = getSessionFilledCount();
+  statsEl.textContent = `${filled} positions \u00B7 ${total} total attempts`;
+  document.getElementById('cycle-modal').style.display = 'flex';
+  document.getElementById('cycle-modal-backdrop').style.display = 'block';
+}
+
+function hideCycleModal() {
+  document.getElementById('cycle-modal').style.display = 'none';
+  document.getElementById('cycle-modal-backdrop').style.display = 'none';
+}
+
+function startNewCycle() {
+  hideCycleModal();
+  const data = getAppData();
+  const session = createSession();
+  data.sessions.push(session);
+  data.activeSessionId = session.id;
+  saveData(data);
+  state.selectedBall = 1;
+  state.selectedPosition = null;
+  state.currentInput = '2';
+  state.freshInput = true;
+  state.shotType = 'cut';
+  resumeProgression();
+  renderAll();
+  showToast('New cycle started');
+}
+
 function renderAll() {
   ensureValidPosition();
   applyShotType();
@@ -797,6 +869,7 @@ function renderAll() {
   renderDirToggle();
   renderTotals();
   renderSessionSelector();
+  renderCycleProgress();
   renderTableDiagram();
   renderShotInfo();
 }
@@ -915,6 +988,11 @@ function pressSave() {
   state.currentInput = '2';
   state.freshInput = true;
   renderAll();
+
+  // Check if entire cycle is now complete
+  if (isCycleComplete()) {
+    showCycleComplete();
+  }
 }
 
 function showToast(msg) {
@@ -957,6 +1035,10 @@ function showPosPopover(ballNum, posKey) {
 // ── Session Management ──────────────────────────────
 
 function newSession() {
+  if (!isCycleComplete()) {
+    const { done } = getCycleProgress();
+    if (!confirm(`Current cycle has ${done}/12 drills complete. Start a new cycle anyway? (Current progress will be kept in history.)`)) return;
+  }
   const data = getAppData();
   const session = createSession();
   data.sessions.push(session);
@@ -967,8 +1049,9 @@ function newSession() {
   state.currentInput = '2';
   state.freshInput = true;
   state.shotType = 'cut';
+  resumeProgression();
   renderAll();
-  showToast('New session started');
+  showToast('New cycle started');
 }
 
 function resetSession() {
@@ -1009,6 +1092,7 @@ function switchSession(id) {
   state.selectedPosition = null;
   state.currentInput = '2';
   state.freshInput = true;
+  resumeProgression();
   renderAll();
 }
 
@@ -1103,6 +1187,11 @@ function init() {
   document.getElementById('btn-delete-session').addEventListener('click', deleteSession);
   document.getElementById('btn-reset-all').addEventListener('click', resetAll);
   document.getElementById('btn-export').addEventListener('click', exportData);
+
+  // Cycle modal
+  document.getElementById('btn-new-cycle').addEventListener('click', startNewCycle);
+  document.getElementById('btn-dismiss-cycle').addEventListener('click', hideCycleModal);
+  document.getElementById('cycle-modal-backdrop').addEventListener('click', hideCycleModal);
 
   document.getElementById('session-select').addEventListener('change', (e) => {
     switchSession(e.target.value);
