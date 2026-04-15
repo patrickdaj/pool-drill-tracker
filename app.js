@@ -766,9 +766,10 @@ function renderTableDiagram() {
   const zoneX = dx(6) + dSpaceX / 2;
   svg += `<line x1="${zoneX}" y1="${margin + railW + 2}" x2="${zoneX}" y2="${margin + railW + innerH - 2}" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4,4"/>`;
 
-  // Diamond markers on rails (skip pocket positions)
+  // Diamond markers on rails (skip pockets + positions adjacent to corner pockets)
   const pocketSet = new Set(pockets.map(([c, r]) => c + ',' + r));
   for (let c = 0; c <= 8; c++) {
+    if (c === 1 || c === 7) continue;
     if (!pocketSet.has(c + ',4')) {
       svg += `<circle cx="${dx(c)}" cy="${margin + 4}" r="2" fill="#8d6e63"/>`;
     }
@@ -1469,8 +1470,9 @@ function renderMxTableSvg() {
     svg += `<circle cx="${dx(c)}" cy="${dy(r)}" r="8" fill="#0a0a0a"/>`;
   }
 
-  // Diamond markers on rails
+  // Diamond markers on rails (skip pockets + positions adjacent to corner pockets)
   for (let c = 0; c <= 8; c++) {
+    if (c === 1 || c === 7) continue;
     if (!pocketSet.has(c + ',4')) svg += `<circle cx="${dx(c)}" cy="${margin + 4}" r="2" fill="#8d6e63"/>`;
     if (!pocketSet.has(c + ',0')) svg += `<circle cx="${dx(c)}" cy="${margin + 2 * railW + innerH - 4}" r="2" fill="#8d6e63"/>`;
   }
