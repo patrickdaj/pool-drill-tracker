@@ -831,17 +831,22 @@ function renderCycleProgress() {
 }
 
 function showCycleComplete() {
+  const modal = document.getElementById('cycle-modal');
+  const backdrop = document.getElementById('cycle-modal-backdrop');
+  if (!modal || !backdrop) return;
   const statsEl = document.getElementById('cycle-modal-stats');
   const total = getSessionTotal();
   const filled = getSessionFilledCount();
-  statsEl.textContent = `${filled} positions \u00B7 ${total} total attempts`;
-  document.getElementById('cycle-modal').style.display = 'flex';
-  document.getElementById('cycle-modal-backdrop').style.display = 'block';
+  if (statsEl) statsEl.textContent = `${filled} positions \u00B7 ${total} total attempts`;
+  modal.style.display = 'flex';
+  backdrop.style.display = 'block';
 }
 
 function hideCycleModal() {
-  document.getElementById('cycle-modal').style.display = 'none';
-  document.getElementById('cycle-modal-backdrop').style.display = 'none';
+  const modal = document.getElementById('cycle-modal');
+  const backdrop = document.getElementById('cycle-modal-backdrop');
+  if (modal) modal.style.display = 'none';
+  if (backdrop) backdrop.style.display = 'none';
 }
 
 function startNewCycle() {
@@ -1189,9 +1194,12 @@ function init() {
   document.getElementById('btn-export').addEventListener('click', exportData);
 
   // Cycle modal
-  document.getElementById('btn-new-cycle').addEventListener('click', startNewCycle);
-  document.getElementById('btn-dismiss-cycle').addEventListener('click', hideCycleModal);
-  document.getElementById('cycle-modal-backdrop').addEventListener('click', hideCycleModal);
+  const btnNewCycle = document.getElementById('btn-new-cycle');
+  const btnDismissCycle = document.getElementById('btn-dismiss-cycle');
+  const cycleBackdrop = document.getElementById('cycle-modal-backdrop');
+  if (btnNewCycle) btnNewCycle.addEventListener('click', startNewCycle);
+  if (btnDismissCycle) btnDismissCycle.addEventListener('click', hideCycleModal);
+  if (cycleBackdrop) cycleBackdrop.addEventListener('click', hideCycleModal);
 
   document.getElementById('session-select').addEventListener('change', (e) => {
     switchSession(e.target.value);
