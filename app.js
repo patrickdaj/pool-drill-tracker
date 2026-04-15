@@ -274,7 +274,6 @@ const DRILL_TYPES = {
 // ── Mighty X Constants ──────────────────────────────
 
 const MX_SIDES = ['left', 'right'];
-const MX_LEVELS = [1, 2, 3];
 const MX_SHOTS = ['follow', 'draw', 'stop'];
 const MX_SHOT_COLORS = { follow: '#6ee7a0', draw: '#e8a23a', stop: '#7aa2f7' };
 const MX_SHOT_LABELS = { follow: 'Follow', draw: 'Draw', stop: 'Stop' };
@@ -291,13 +290,21 @@ const MX_DIAG_POCKET = {
   left:  { col: 0, row: 4 }, // TL pocket
   right: { col: 0, row: 0 }, // BL pocket
 };
-// OB/CB combos per diagonal, ordered by difficulty (uses 0-based position indices into MX_DIAG_POS)
+// All OB/CB combos — every pair where OB is closer to pocket than CB (0-based indices)
 const MX_COMBOS = [
-  { ob: 0, cb: 2, label: 'Short' },  // OB near pocket, CB 2 diamonds away
-  { ob: 1, cb: 3, label: 'Medium' }, // OB 1 dia out, CB 2 diamonds away (center of table)
-  { ob: 0, cb: 4, label: 'Long' },   // OB near pocket, CB 4 diamonds away
+  { ob: 0, cb: 1, label: '1→2' },
+  { ob: 0, cb: 2, label: '1→3' },
+  { ob: 0, cb: 3, label: '1→4' },
+  { ob: 0, cb: 4, label: '1→5' },
+  { ob: 1, cb: 2, label: '2→3' },
+  { ob: 1, cb: 3, label: '2→4' },
+  { ob: 1, cb: 4, label: '2→5' },
+  { ob: 2, cb: 3, label: '3→4' },
+  { ob: 2, cb: 4, label: '3→5' },
+  { ob: 3, cb: 4, label: '4→5' },
 ];
-const MX_COMBO_LABELS = { 1: 'Short', 2: 'Medium', 3: 'Long' };
+const MX_LEVELS = MX_COMBOS.map((_, i) => i + 1);
+const MX_COMBO_LABELS = Object.fromEntries(MX_COMBOS.map((c, i) => [i + 1, c.label]));
 
 const MX_TOTAL = MX_SIDES.length * MX_LEVELS.length * MX_SHOTS.length;
 function mxKey(side, level, shot) { return `${side}-${level}-${shot}`; }
@@ -1546,7 +1553,7 @@ function renderMightyX() {
   html += `<div class="drill-info">`;
   const comboInfo = MX_COMBOS[state.mxLevel - 1];
   html += `<span style="color:${state.mxSide === 'left' ? '#7aa2f7' : '#e8a23a'}">${state.mxSide === 'left' ? '↘ TL→BR' : '↗ BL→TR'}</span>`;
-  html += ` · ${comboInfo.label} · `;
+  html += ` · OB${comboInfo.ob + 1} → CB${comboInfo.cb + 1} · `;
   html += `<span style="color:${MX_SHOT_COLORS[state.mxShot]}">${MX_SHOT_LABELS[state.mxShot]}</span>`;
   html += `</div>`;
   html += `</div>`;
@@ -1561,11 +1568,11 @@ function renderMightyX() {
   }
   html += `</div></div>`;
 
-  // Position combo selector
-  html += `<div class="drill-selector"><div class="selector-label">OB / CB Position</div><div class="drill-toggle">`;
+  // Position combo selector (compact grid for 10 combos)
+  html += `<div class="drill-selector"><div class="selector-label">OB → CB Position</div><div class="drill-toggle mx-combo-grid">`;
   for (const level of MX_LEVELS) {
     const allDone = MX_SHOTS.every(s => isMxEntryComplete(mxKey(state.mxSide, level, s)));
-    html += `<button class="drill-toggle-btn ${level === state.mxLevel ? 'active' : ''} ${allDone ? 'done' : ''}" data-mx-level="${level}">${MX_COMBO_LABELS[level]}</button>`;
+    html += `<button class="drill-toggle-btn mx-combo-btn ${level === state.mxLevel ? 'active' : ''} ${allDone ? 'done' : ''}" data-mx-level="${level}">${MX_COMBO_LABELS[level]}</button>`;
   }
   html += `</div></div>`;
 

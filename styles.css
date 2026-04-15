@@ -820,6 +820,18 @@ body {
   border-color: color-mix(in srgb, var(--shot-color, #6ee7a0) 30%, transparent);
 }
 
+.mx-combo-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+.mx-combo-btn {
+  flex: none;
+  padding: 6px 2px;
+  font-size: 0.65rem;
+}
+}
+
 /* Wagon spoke grid */
 .wagon-spoke-grid {
   display: grid;
