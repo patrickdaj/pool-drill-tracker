@@ -1574,7 +1574,7 @@ function renderMxTableSvg() {
   // CB — white ball at current combo's CB position
   const cbPos = diagPos[combo.cb];
   const cbX = dx(cbPos.col), cbY = dy(cbPos.row);
-  svg += `<circle cx="${cbX}" cy="${cbY}" r="10" fill="#f5f5f5" stroke="#fff" stroke-width="2"/>`;
+  svg += `<circle cx="${cbX}" cy="${cbY}" r="8" fill="#f5f5f5" stroke="#fff" stroke-width="1.5"/>`;
   svg += `<ellipse cx="${cbX - 2}" cy="${cbY - 2}" rx="3" ry="2" fill="rgba(255,255,255,0.6)" transform="rotate(-30 ${cbX - 2} ${cbY - 2})"/>`;
 
   // Arrow from CB toward OB to show shot direction

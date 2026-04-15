@@ -2,6 +2,9 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   font-size: 16px;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -11,15 +14,14 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
   background: #0f0f1a;
   color: #e8e8ef;
-  min-height: 100dvh;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   user-select: none;
   -webkit-user-select: none;
   overflow-x: hidden;
-  overflow-y: auto;
-  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 16px);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
