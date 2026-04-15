@@ -29,6 +29,14 @@ function hitPct(attempts) {
   return attempts > 0 ? (REQUIRED_MAKES / attempts * 100) : 0;
 }
 
+function wwStatLabel(pos) {
+  if (pos.row === 4) return `T${pos.col}`;
+  if (pos.row === 0) return `B${pos.col}`;
+  if (pos.col === 0) return `L${pos.row}`;
+  if (pos.col === 8) return `R${pos.row}`;
+  return `${pos.col},${pos.row}`;
+}
+
 function pctClass(pct) {
   if (pct >= 80) return 'pct-good';
   if (pct >= 50) return 'pct-ok';
@@ -509,16 +517,20 @@ function renderMxStats() {
 // ── Wagon Wheel Stats ───────────────────────────────
 
 function computeWagonStats(sessions) {
-  const bySpoke = [];
-  for (let i = 0; i < WAGON_SPOKES.length; i++) bySpoke.push({ sum: 0, count: 0 });
+  // Aggregate across all 18 diamond positions
+  const byPos = {};
+  for (const pos of WW_ALL_DIAMONDS) {
+    byPos[wwKey(pos)] = { sum: 0, count: 0, pos };
+  }
   let totalAttempts = 0, totalSlots = 0;
 
   for (const session of sessions) {
-    for (let i = 0; i < WAGON_SPOKES.length; i++) {
-      const entry = session.data[wagonKey(i)];
+    for (const pos of WW_ALL_DIAMONDS) {
+      const key = wwKey(pos);
+      const entry = session.data[key];
       if (entry && entry.attempts >= 2) {
-        bySpoke[i].sum += entry.attempts;
-        bySpoke[i].count++;
+        byPos[key].sum += entry.attempts;
+        byPos[key].count++;
         totalAttempts += entry.attempts;
         totalSlots++;
       }
@@ -526,7 +538,7 @@ function computeWagonStats(sessions) {
   }
   const sessionAvg = totalSlots > 0 ? totalAttempts / totalSlots : 0;
   const sessionPct = totalSlots > 0 ? (REQUIRED_MAKES / sessionAvg * 100) : 0;
-  return { bySpoke, totalAttempts, totalSlots, sessionAvg, sessionPct };
+  return { byPos, totalAttempts, totalSlots, sessionAvg, sessionPct };
 }
 
 function renderWagonStats() {
@@ -542,34 +554,35 @@ function renderWagonStats() {
   const sg = document.getElementById('stats-session-grid');
   const isMulti = statsView !== 'session';
   let best = null, worst = null;
-  for (let i = 0; i < s.bySpoke.length; i++) {
-    const d = s.bySpoke[i];
+  const posEntries = Object.entries(s.byPos);
+  for (const [key, d] of posEntries) {
     if (d.count > 0) {
       const avg = d.sum / d.count;
-      if (!best || avg < best.avg) best = { spoke: i, avg };
-      if (!worst || avg > worst.avg) worst = { spoke: i, avg };
+      if (!best || avg < best.avg) best = { key, pos: d.pos, avg };
+      if (!worst || avg > worst.avg) worst = { key, pos: d.pos, avg };
     }
   }
+  const filledCount = posEntries.filter(([_, d]) => d.count > 0).length;
   sg.innerHTML = `
     <div class="stats-item"><div class="stats-item-value">${s.sessionPct.toFixed(0)}%</div><div class="stats-item-label">Hit Rate</div></div>
     <div class="stats-item"><div class="stats-item-value">${s.sessionAvg.toFixed(1)}</div><div class="stats-item-label">Avg Attempts</div></div>
-    <div class="stats-item"><div class="stats-item-value">${s.totalSlots}/12</div><div class="stats-item-label">${isMulti ? 'Spokes Seen' : 'Filled'}</div></div>
-    <div class="stats-item"><div class="stats-item-value">${best ? WAGON_SPOKES[best.spoke].label : '-'}</div><div class="stats-item-label">Best (${best ? best.avg.toFixed(1) : '-'})</div></div>
-    <div class="stats-item"><div class="stats-item-value">${worst ? WAGON_SPOKES[worst.spoke].label : '-'}</div><div class="stats-item-label">Worst (${worst ? worst.avg.toFixed(1) : '-'})</div></div>
+    <div class="stats-item"><div class="stats-item-value">${filledCount}/18</div><div class="stats-item-label">${isMulti ? 'Positions Seen' : 'Filled'}</div></div>
+    <div class="stats-item"><div class="stats-item-value">${best ? wwStatLabel(best.pos) : '-'}</div><div class="stats-item-label">Best (${best ? best.avg.toFixed(1) : '-'})</div></div>
+    <div class="stats-item"><div class="stats-item-value">${worst ? wwStatLabel(worst.pos) : '-'}</div><div class="stats-item-label">Worst (${worst ? worst.avg.toFixed(1) : '-'})</div></div>
     <div class="stats-item"><div class="stats-item-value">${isMulti ? sessions.length : s.totalAttempts}</div><div class="stats-item-label">${isMulti ? 'Sessions' : 'Total Attempts'}</div></div>
   `;
 
-  // Per-spoke breakdown → use type grid
+  // Per-position breakdown → use type grid
   const tg = document.getElementById('stats-type-grid');
   let spokeHtml = '';
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
-    const d = s.bySpoke[i];
+  for (const pos of WW_ALL_DIAMONDS) {
+    const d = s.byPos[wwKey(pos)];
     const avg = d.count > 0 ? d.sum / d.count : 0;
     const pct = avg > 0 ? hitPct(avg) : 0;
-    spokeHtml += `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${WAGON_SPOKES[i].label} (${d.count})</div></div>`;
+    spokeHtml += `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${wwStatLabel(pos)} (${d.count})</div></div>`;
   }
   tg.innerHTML = spokeHtml;
-  tg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'Per Spoke';
+  tg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'Per Position';
 
   // Hide irrelevant sections
   const ag = document.getElementById('stats-angle-grid');

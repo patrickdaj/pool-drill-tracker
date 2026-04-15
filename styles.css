@@ -830,6 +830,11 @@ body {
   padding: 6px 2px;
   font-size: 0.65rem;
 }
+
+/* Positions mode toggle */
+.pos-mode-toggle {
+  max-width: 440px;
+  padding: 4px 0;
 }
 
 /* Wagon spoke grid */

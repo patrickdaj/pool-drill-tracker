@@ -311,22 +311,49 @@ function mxKey(side, level, shot) { return `${side}-${level}-${shot}`; }
 
 // ── Wagon Wheel Constants ───────────────────────────
 
-const WAGON_SPOKES = [
-  { col: 1, row: 4, label: 'Top 1' },
-  { col: 3, row: 4, label: 'Top 3' },
-  { col: 5, row: 4, label: 'Top 5' },
-  { col: 7, row: 4, label: 'Top 7' },
-  { col: 8, row: 3, label: 'Rt ↑' },
-  { col: 8, row: 1, label: 'Rt ↓' },
-  { col: 7, row: 0, label: 'Bot 7' },
-  { col: 5, row: 0, label: 'Bot 5' },
-  { col: 3, row: 0, label: 'Bot 3' },
-  { col: 0, row: 1, label: 'Lt ↓' },
-  { col: 0, row: 3, label: 'Lt ↑' },
-  { col: 4, row: 0, label: 'Side Pkt' },
+// All 18 diamond positions clockwise from just right of TS pocket
+const WW_ALL_DIAMONDS = [
+  { col: 5, row: 4 }, { col: 6, row: 4 }, { col: 7, row: 4 },  // top rail right
+  { col: 8, row: 3 }, { col: 8, row: 2 }, { col: 8, row: 1 },  // right rail
+  { col: 7, row: 0 }, { col: 6, row: 0 }, { col: 5, row: 0 },  // bottom rail right
+  { col: 3, row: 0 }, { col: 2, row: 0 }, { col: 1, row: 0 },  // bottom rail left
+  { col: 0, row: 1 }, { col: 0, row: 2 }, { col: 0, row: 3 },  // left rail
+  { col: 1, row: 4 }, { col: 2, row: 4 }, { col: 3, row: 4 },  // top rail left
 ];
 
-function wagonKey(spokeIdx) { return `spoke-${spokeIdx + 1}`; }
+// Right side: 12 positions clockwise from TS (top→right→bottom all the way)
+const WW_RIGHT = WW_ALL_DIAMONDS.slice(0, 12);
+// Left side: 12 positions CCW from BS (bottom-left→left rail→top all the way)
+const WW_LEFT = [
+  { col: 3, row: 0 }, { col: 2, row: 0 }, { col: 1, row: 0 },  // bottom rail left
+  { col: 0, row: 1 }, { col: 0, row: 2 }, { col: 0, row: 3 },  // left rail
+  { col: 1, row: 4 }, { col: 2, row: 4 }, { col: 3, row: 4 },  // top rail left
+  { col: 5, row: 4 }, { col: 6, row: 4 }, { col: 7, row: 4 },  // top rail right
+];
+
+const WW_POSITIONS = {
+  right: WW_RIGHT,
+  left:  WW_LEFT,
+  full:  WW_ALL_DIAMONDS,
+};
+
+const WW_TARGETS = {
+  right: { col: 4, row: 4, label: 'TS' },  // top side pocket
+  left:  { col: 4, row: 0, label: 'BS' },  // bottom side pocket
+  full:  null, // determined per position
+};
+
+const WW_SIDES = ['right', 'left', 'full'];
+
+function wwKey(pos) { return `ww-${pos.col}-${pos.row}`; }
+function wwCurrentPositions() { return WW_POSITIONS[state.wagonSide]; }
+function wwCurrentTotal() { return wwCurrentPositions().length; }
+
+function wwTargetForPos(pos) {
+  if (state.wagonSide !== 'full') return WW_TARGETS[state.wagonSide];
+  // Full mode: right half → TS, left half → BS
+  return (pos.col > 4 || (pos.col === 8)) ? { col: 4, row: 4 } : (pos.col < 4 || pos.col === 0) ? { col: 4, row: 0 } : (pos.row >= 2 ? { col: 4, row: 4 } : { col: 4, row: 0 });
+}
 
 // ── State ───────────────────────────────────────────
 
@@ -338,12 +365,15 @@ const state = {
   freshInput: true,           // true = first digit replaces default
   shotType: 'cut',
   direction: 'L',            // 'L' or 'R' — only matters for dual positions
+  posRandom: false,          // random mode for positions drill
   // Mighty X state
   mxSide: 'left',
   mxLevel: 1,
   mxShot: 'follow',
+  mxRandom: false,           // random mode for mighty x
   // Wagon Wheel state
-  wagonSpoke: 0,             // index into WAGON_SPOKES (0-11)
+  wagonSide: 'right',        // 'right' | 'left' | 'full'
+  wagonSpoke: 0,             // index into wwCurrentPositions()
   wagonRandom: false,
 };
 
@@ -640,61 +670,60 @@ function mxResumeProgression() {
 
 // ── Wagon Wheel Data Functions ──────────────────────
 
-function getWagonEntry(spokeIdx) {
+function getWagonEntry(idx) {
+  const positions = wwCurrentPositions();
+  const pos = positions[idx];
   const session = getActiveSession();
-  return session.data[wagonKey(spokeIdx)] || null;
+  return session.data[wwKey(pos)] || null;
 }
 
-function saveWagonEntry(spokeIdx, attempts) {
+function saveWagonEntry(idx, attempts) {
+  const positions = wwCurrentPositions();
+  const pos = positions[idx];
   const data = getAppData();
   const session = data.sessions.find(s => s.id === data.activeSessionId);
-  const key = wagonKey(spokeIdx);
+  const key = wwKey(pos);
   const prev = session.data[key];
   session.data[key] = { attempts, note: (prev && prev.note) || '' };
   saveData(data);
 }
 
-function saveWagonNote(spokeIdx, note) {
-  const data = getAppData();
-  const session = data.sessions.find(s => s.id === data.activeSessionId);
-  const key = wagonKey(spokeIdx);
-  if (!session.data[key]) session.data[key] = { attempts: 0, note };
-  else session.data[key].note = note;
-  saveData(data);
-}
-
-function isWagonSpokeComplete(spokeIdx) {
-  const entry = getWagonEntry(spokeIdx);
+function isWagonSpokeComplete(idx) {
+  const entry = getWagonEntry(idx);
   return entry && entry.attempts >= 2;
 }
 
 function isWagonCycleComplete() {
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+  const positions = wwCurrentPositions();
+  for (let i = 0; i < positions.length; i++) {
     if (!isWagonSpokeComplete(i)) return false;
   }
   return true;
 }
 
 function getWagonCycleProgress() {
+  const positions = wwCurrentPositions();
   let done = 0;
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+  for (let i = 0; i < positions.length; i++) {
     if (isWagonSpokeComplete(i)) done++;
   }
-  return { done, total: WAGON_SPOKES.length };
+  return { done, total: positions.length };
 }
 
 function getWagonSessionTotal() {
   const session = getActiveSession();
+  const positions = wwCurrentPositions();
   let total = 0;
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
-    const entry = session.data[wagonKey(i)];
+  for (let i = 0; i < positions.length; i++) {
+    const entry = session.data[wwKey(positions[i])];
     if (entry && entry.attempts) total += entry.attempts;
   }
   return total;
 }
 
 function wagonResumeProgression() {
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+  const positions = wwCurrentPositions();
+  for (let i = 0; i < positions.length; i++) {
     if (!isWagonSpokeComplete(i)) {
       state.wagonSpoke = i;
       return;
@@ -703,12 +732,53 @@ function wagonResumeProgression() {
 }
 
 function wagonPickRandom() {
+  const positions = wwCurrentPositions();
   const incomplete = [];
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+  for (let i = 0; i < positions.length; i++) {
     if (!isWagonSpokeComplete(i)) incomplete.push(i);
   }
   if (incomplete.length === 0) return;
   state.wagonSpoke = incomplete[Math.floor(Math.random() * incomplete.length)];
+}
+
+// ── MX Random Mode ──────────────────────────────────
+
+function mxPickRandom() {
+  const incomplete = [];
+  for (const side of MX_SIDES) {
+    for (const level of MX_LEVELS) {
+      for (const shot of MX_SHOTS) {
+        if (!isMxEntryComplete(mxKey(side, level, shot))) incomplete.push({ side, level, shot });
+      }
+    }
+  }
+  if (incomplete.length === 0) return;
+  const pick = incomplete[Math.floor(Math.random() * incomplete.length)];
+  state.mxSide = pick.side;
+  state.mxLevel = pick.level;
+  state.mxShot = pick.shot;
+}
+
+// ── Positions Random Mode ───────────────────────────
+
+function posPickRandom() {
+  const incomplete = [];
+  for (let b = 1; b <= 12; b++) {
+    const positions = getCuePositions(b);
+    for (const p of positions) {
+      const key = coordKey(p);
+      if (!isPositionComplete(b, key)) {
+        incomplete.push({ ball: b, key });
+      }
+    }
+  }
+  if (incomplete.length === 0) return;
+  const pick = incomplete[Math.floor(Math.random() * incomplete.length)];
+  state.selectedBall = pick.ball;
+  state.selectedPosition = pick.key;
+  if (isDualPosition(pick.ball, pick.key)) {
+    state.direction = !getEntry(pick.ball, pick.key, 'L') ? 'L' : 'R';
+  }
 }
 
 // ── SVG Table Diagram ───────────────────────────────
@@ -1256,34 +1326,39 @@ function pressSave() {
     }
   }
 
-  // Auto-advance to next unfilled position (from start of sequence)
-  const positions = getCuePositions(state.selectedBall);
-  let advanced = false;
-  for (let i = 0; i < positions.length; i++) {
-    const nextKey = coordKey(positions[i]);
-    if (!isPositionComplete(state.selectedBall, nextKey)) {
-      state.selectedPosition = nextKey;
-      if (isDualPosition(state.selectedBall, nextKey)) {
-        state.direction = !getEntry(state.selectedBall, nextKey, 'L') ? 'L' : 'R';
-      }
-      advanced = true;
-      break;
-    }
-  }
-
-  // All positions filled for this ball — advance to next ball
-  if (!advanced) {
-    for (let i = 1; i <= 12; i++) {
-      const nextBall = ((state.selectedBall - 1 + i) % 12) + 1;
-      const nextPositions = getCuePositions(nextBall);
-      const unfilled = nextPositions.find((p) => !isPositionComplete(nextBall, coordKey(p)));
-      if (unfilled) {
-        state.selectedBall = nextBall;
-        state.selectedPosition = coordKey(unfilled);
-        if (isDualPosition(nextBall, coordKey(unfilled))) {
-          state.direction = !getEntry(nextBall, coordKey(unfilled), 'L') ? 'L' : 'R';
+  // Auto-advance: random or sequential
+  if (state.posRandom) {
+    posPickRandom();
+  } else {
+    // Auto-advance to next unfilled position (from start of sequence)
+    const positions = getCuePositions(state.selectedBall);
+    let advanced = false;
+    for (let i = 0; i < positions.length; i++) {
+      const nextKey = coordKey(positions[i]);
+      if (!isPositionComplete(state.selectedBall, nextKey)) {
+        state.selectedPosition = nextKey;
+        if (isDualPosition(state.selectedBall, nextKey)) {
+          state.direction = !getEntry(state.selectedBall, nextKey, 'L') ? 'L' : 'R';
         }
+        advanced = true;
         break;
+      }
+    }
+
+    // All positions filled for this ball — advance to next ball
+    if (!advanced) {
+      for (let i = 1; i <= 12; i++) {
+        const nextBall = ((state.selectedBall - 1 + i) % 12) + 1;
+        const nextPositions = getCuePositions(nextBall);
+        const unfilled = nextPositions.find((p) => !isPositionComplete(nextBall, coordKey(p)));
+        if (unfilled) {
+          state.selectedBall = nextBall;
+          state.selectedPosition = coordKey(unfilled);
+          if (isDualPosition(nextBall, coordKey(unfilled))) {
+            state.direction = !getEntry(nextBall, coordKey(unfilled), 'L') ? 'L' : 'R';
+          }
+          break;
+        }
       }
     }
   }
@@ -1345,8 +1420,8 @@ function newSession() {
     const { done } = getMxCycleProgress();
     if (!confirm(`Current cycle has ${done}/${MX_TOTAL} entries complete. Start a new cycle anyway?`)) return;
   } else if (state.drillType === 'wagon' && !isWagonCycleComplete()) {
-    const { done } = getWagonCycleProgress();
-    if (!confirm(`Current cycle has ${done}/12 spokes complete. Start a new cycle anyway?`)) return;
+    const { done, total } = getWagonCycleProgress();
+    if (!confirm(`Current cycle has ${done}/${total} positions complete. Start a new cycle anyway?`)) return;
   }
   const data = getAppData();
   const session = createSession(state.drillType);
@@ -1575,6 +1650,12 @@ function renderMightyX() {
   }
   html += `</div></div>`;
 
+  // Mode toggle (Sequential / Random)
+  html += `<div class="drill-selector"><div class="drill-toggle">`;
+  html += `<button class="drill-toggle-btn ${!state.mxRandom ? 'active' : ''}" data-mx-mode="seq">Sequential</button>`;
+  html += `<button class="drill-toggle-btn ${state.mxRandom ? 'active' : ''}" data-mx-mode="rand">🎲 Random</button>`;
+  html += `</div></div>`;
+
   // Input row
   html += `<div class="input-row">`;
   html += `<div class="attempt-display" id="drill-attempt-display"><span class="attempt-number" id="drill-attempt-number">${state.currentInput}</span></div>`;
@@ -1622,24 +1703,48 @@ function renderWagonTableSvg() {
   svg += `<rect x="${ox}" y="${margin + railW}" width="${innerW}" height="${innerH}" rx="2" fill="#2a7a35"/>`;
   svg += `<rect x="${margin}" y="${margin}" width="${innerW + 2 * railW}" height="${innerH + 2 * railW}" rx="10" fill="none" stroke="#3e2723" stroke-width="2"/>`;
 
+  // Pockets
   const pockets = [[0,0],[0,4],[4,0],[4,4],[8,0],[8,4]];
+  const pocketSet = new Set(pockets.map(([c, r]) => c + ',' + r));
   for (const [c, r] of pockets) {
     svg += `<circle cx="${dx(c)}" cy="${dy(r)}" r="8" fill="#0a0a0a"/>`;
   }
 
-  const cx = dx(4), cy = dy(2);
+  // Diamond markers on rails (skip pocket positions)
+  for (let c = 0; c <= 8; c++) {
+    if (!pocketSet.has(c + ',4')) svg += `<circle cx="${dx(c)}" cy="${margin + 4}" r="2" fill="#8d6e63"/>`;
+    if (!pocketSet.has(c + ',0')) svg += `<circle cx="${dx(c)}" cy="${margin + 2 * railW + innerH - 4}" r="2" fill="#8d6e63"/>`;
+  }
+  for (let r = 0; r <= 4; r++) {
+    if (!pocketSet.has('0,' + r)) svg += `<circle cx="${margin + 4}" cy="${dy(r)}" r="2" fill="#8d6e63"/>`;
+    if (!pocketSet.has('8,' + r)) svg += `<circle cx="${margin + 2 * railW + innerW - 4}" cy="${dy(r)}" r="2" fill="#8d6e63"/>`;
+  }
 
-  // Center hub
-  svg += `<circle cx="${cx}" cy="${cy}" r="5" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>`;
+  const positions = wwCurrentPositions();
+  const currentPos = positions[state.wagonSpoke];
+  const target = state.wagonSide === 'full' ? wwTargetForPos(currentPos) : WW_TARGETS[state.wagonSide];
 
-  // Spokes and endpoints
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
-    const spoke = WAGON_SPOKES[i];
-    const sx = dx(spoke.col), sy = dy(spoke.row);
+  // Highlight target pocket
+  if (target) {
+    svg += `<circle cx="${dx(target.col)}" cy="${dy(target.row)}" r="12" fill="none" stroke="#6ee7a0" stroke-width="2.5" stroke-opacity="0.7"/>`;
+    // OB ball hanging in target pocket
+    svg += `<circle cx="${dx(target.col)}" cy="${dy(target.row)}" r="7" fill="#e53935" stroke="#b71c1c" stroke-width="1"/>`;
+    svg += `<ellipse cx="${dx(target.col) - 1.5}" cy="${dy(target.row) - 1.5}" rx="2" ry="1.5" fill="rgba(255,255,255,0.3)" transform="rotate(-30 ${dx(target.col) - 1.5} ${dy(target.row) - 1.5})"/>`;
+  }
+
+  // All positions as markers with spokes from target
+  for (let i = 0; i < positions.length; i++) {
+    const pos = positions[i];
+    const sx = dx(pos.col), sy = dy(pos.row);
     const complete = isWagonSpokeComplete(i);
     const isCurrent = i === state.wagonSpoke;
-    const strokeColor = complete ? 'rgba(110,231,160,0.3)' : isCurrent ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.06)';
-    svg += `<line x1="${cx}" y1="${cy}" x2="${sx}" y2="${sy}" stroke="${strokeColor}" stroke-width="1.5"/>`;
+    const posTarget = state.wagonSide === 'full' ? wwTargetForPos(pos) : target;
+
+    // Spoke line from position to target
+    if (posTarget) {
+      const strokeColor = complete ? 'rgba(110,231,160,0.25)' : isCurrent ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.04)';
+      svg += `<line x1="${dx(posTarget.col)}" y1="${dy(posTarget.row)}" x2="${sx}" y2="${sy}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="3,3"/>`;
+    }
 
     const r = isCurrent ? 13 : 10;
     let fill;
@@ -1663,12 +1768,22 @@ function renderWagonTableSvg() {
   return svg;
 }
 
+function wwPosLabel(pos) {
+  if (pos.row === 4) return `T${pos.col}`;
+  if (pos.row === 0) return `B${pos.col}`;
+  if (pos.col === 0) return `L${pos.row}`;
+  if (pos.col === 8) return `R${pos.row}`;
+  return `${pos.col},${pos.row}`;
+}
+
 function renderWagonWheel() {
   const container = document.getElementById('other-drill-content');
   if (!container) return;
+  const positions = wwCurrentPositions();
   const entry = getWagonEntry(state.wagonSpoke);
-  const spoke = WAGON_SPOKES[state.wagonSpoke];
-  const { done } = getWagonCycleProgress();
+  const currentPos = positions[state.wagonSpoke];
+  const { done, total } = getWagonCycleProgress();
+  const target = state.wagonSide === 'full' ? wwTargetForPos(currentPos) : WW_TARGETS[state.wagonSide];
 
   let html = `<div class="drill-layout">`;
 
@@ -1676,23 +1791,32 @@ function renderWagonWheel() {
   html += `<div class="drill-left">`;
   html += `<div class="table-container" id="wagon-table-container">${renderWagonTableSvg()}</div>`;
   html += `<div class="drill-info">`;
-  html += `Spoke <strong>${state.wagonSpoke + 1}</strong> · ${spoke.label}`;
-  if (state.wagonSpoke === 11) html += ` <span style="color:#e8a23a">(straight draw)</span>`;
+  html += `Position <strong>${state.wagonSpoke + 1}</strong>/${total} · ${wwPosLabel(currentPos)}`;
+  if (target) html += ` → <span style="color:#6ee7a0">${target.col === 4 && target.row === 4 ? 'Top Side' : 'Bottom Side'} Pocket</span>`;
   html += `</div>`;
   html += `</div>`;
 
   // Right: Controls
   html += `<div class="drill-right">`;
 
-  // Spoke selector grid
-  html += `<div class="drill-selector"><div class="selector-label">Spoke</div><div class="wagon-spoke-grid">`;
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
+  // Side selector
+  html += `<div class="drill-selector"><div class="selector-label">Side</div><div class="drill-toggle">`;
+  for (const side of WW_SIDES) {
+    const label = side === 'right' ? 'Right' : side === 'left' ? 'Left' : 'Full';
+    html += `<button class="drill-toggle-btn ${side === state.wagonSide ? 'active' : ''}" data-ww-side="${side}">${label}</button>`;
+  }
+  html += `</div></div>`;
+
+  // Position selector grid
+  const gridCols = total <= 12 ? 6 : 6;
+  html += `<div class="drill-selector"><div class="selector-label">Position</div><div class="wagon-spoke-grid" style="grid-template-columns: repeat(${gridCols}, 1fr)">`;
+  for (let i = 0; i < positions.length; i++) {
     const complete = isWagonSpokeComplete(i);
     html += `<button class="wagon-spoke-btn ${i === state.wagonSpoke ? 'selected' : ''} ${complete ? 'done' : ''}" data-spoke="${i}">${complete ? '✓' : i + 1}</button>`;
   }
   html += `</div></div>`;
 
-  // Random toggle
+  // Mode toggle (Sequential / Random)
   html += `<div class="drill-selector"><div class="drill-toggle">`;
   html += `<button class="drill-toggle-btn ${!state.wagonRandom ? 'active' : ''}" data-wagon-mode="seq">Sequential</button>`;
   html += `<button class="drill-toggle-btn ${state.wagonRandom ? 'active' : ''}" data-wagon-mode="rand">🎲 Random</button>`;
@@ -1702,8 +1826,8 @@ function renderWagonWheel() {
   html += `<div class="input-row">`;
   html += `<div class="attempt-display" id="drill-attempt-display"><span class="attempt-number" id="drill-attempt-number">${state.currentInput}</span></div>`;
   html += `<div class="totals-col">`;
-  html += `<div class="stat-card"><div class="stat-label">Spoke ${state.wagonSpoke + 1}</div><div class="stat-value">${entry && entry.attempts ? entry.attempts : '—'}</div><div class="stat-sub">${spoke.label}</div></div>`;
-  html += `<div class="stat-card"><div class="stat-label">Cycle</div><div class="stat-value">${done}</div><div class="stat-sub">${done}/12</div></div>`;
+  html += `<div class="stat-card"><div class="stat-label">Pos ${state.wagonSpoke + 1}</div><div class="stat-value">${entry && entry.attempts ? entry.attempts : '—'}</div><div class="stat-sub">${wwPosLabel(currentPos)}</div></div>`;
+  html += `<div class="stat-card"><div class="stat-label">Cycle</div><div class="stat-value">${done}</div><div class="stat-sub">${done}/${total}</div></div>`;
   html += `</div></div>`;
 
   // Numpad
@@ -1715,16 +1839,11 @@ function renderWagonWheel() {
   html += `</div>`;
   html += `</div>`; // drill-right
 
-  // Cycle progress dots (12 spokes, fits nicely)
-  html += `<div class="drill-progress">`;
-  html += `<div class="cycle-dots">`;
-  for (let i = 0; i < WAGON_SPOKES.length; i++) {
-    const isDone = isWagonSpokeComplete(i);
-    const isCurr = i === state.wagonSpoke;
-    html += `<span class="cycle-dot ${isDone ? 'done' : ''} ${isCurr ? 'current' : ''}">${i + 1}</span>`;
-  }
-  html += `</div>`;
-  html += `<div class="cycle-count">${done} / 12</div>`;
+  // Cycle progress bar (12 or 18 positions)
+  const pct = total > 0 ? (done / total * 100) : 0;
+  html += `<div class="drill-progress mx-progress">`;
+  html += `<div class="mx-progress-bar"><div class="mx-progress-fill" style="width:${pct}%"></div></div>`;
+  html += `<div class="cycle-count">${done} / ${total}</div>`;
   html += `</div>`;
 
   html += `</div>`; // drill-layout
@@ -1776,10 +1895,25 @@ function attachDrillHandlers(type) {
         renderAll();
       });
     });
+    container.querySelectorAll('[data-mx-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.mxRandom = btn.dataset.mxMode === 'rand';
+        renderAll();
+      });
+    });
   }
 
   // Wagon-specific selectors
   if (type === 'wagon') {
+    container.querySelectorAll('[data-ww-side]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.wagonSide = btn.dataset.wwSide;
+        state.wagonSpoke = 0;
+        wagonResumeProgression();
+        state.currentInput = '2'; state.freshInput = true;
+        renderAll();
+      });
+    });
     container.querySelectorAll('[data-spoke]').forEach(btn => {
       if (btn.classList.contains('spoke-marker')) return; // SVG handled separately
       btn.addEventListener('click', () => {
@@ -1834,7 +1968,8 @@ function pressSaveMx() {
   if (display) { display.classList.add('flash'); setTimeout(() => display.classList.remove('flash'), 400); }
 
   // Auto-advance to next incomplete
-  mxResumeProgression();
+  if (state.mxRandom) mxPickRandom();
+  else mxResumeProgression();
   state.currentInput = '2';
   state.freshInput = true;
   renderAll();
@@ -1860,8 +1995,9 @@ function pressSaveWagon() {
   state.freshInput = true;
   renderAll();
 
+  const wwTotal = wwCurrentTotal();
   if (isWagonCycleComplete()) {
-    showDrillCycleComplete('All 12 Wagon Wheel spokes finished!', 12, getWagonSessionTotal());
+    showDrillCycleComplete(`All ${wwTotal} Wagon Wheel positions finished!`, wwTotal, getWagonSessionTotal());
   }
 }
 
@@ -1907,6 +2043,21 @@ function init() {
   document.getElementById('btn-backspace').addEventListener('click', pressBackspace);
   document.getElementById('btn-save').addEventListener('click', pressSave);
 
+  // Positions random mode toggle
+  function updatePosModeBtns() {
+    const seqBtn = document.getElementById('btn-pos-seq');
+    const randBtn = document.getElementById('btn-pos-rand');
+    if (seqBtn) seqBtn.classList.toggle('active', !state.posRandom);
+    if (randBtn) randBtn.classList.toggle('active', state.posRandom);
+  }
+  document.getElementById('btn-pos-seq').addEventListener('click', () => {
+    state.posRandom = false;
+    updatePosModeBtns();
+  });
+  document.getElementById('btn-pos-rand').addEventListener('click', () => {
+    state.posRandom = true;
+    updatePosModeBtns();
+  });
 
   // Direction toggle (L/R for dual positions)
   document.getElementById('btn-dir-l').addEventListener('click', () => {
