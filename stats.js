@@ -6,6 +6,7 @@ const REQUIRED_MAKES = 2;
 const TRENDING_COUNT = 5;
 
 let statsView = 'session'; // 'session' | 'trending' | 'history'
+let statsDrillType = 'positions'; // current drill type filter
 
 function cbDistance(ballNum, posKey) {
   const bp = BALL_POSITIONS[ballNum];
@@ -66,10 +67,14 @@ function mergeSessionsData(sessions) {
 /** Get sessions for the current view. */
 function getViewSessions() {
   const data = getAppData();
-  const sorted = [...data.sessions].sort((a, b) => b.id.localeCompare(a.id));
+  const typed = data.sessions.filter(s => (s.drillType || 'positions') === statsDrillType);
+  const sorted = [...typed].sort((a, b) => b.id.localeCompare(a.id));
   if (statsView === 'trending') return sorted.slice(0, TRENDING_COUNT);
   if (statsView === 'history') return sorted;
-  return [getActiveSession()];
+  // Session view — use active if it matches, otherwise most recent of type
+  const active = data.sessions.find(s => s.id === data.activeSessionId);
+  if (active && (active.drillType || 'positions') === statsDrillType) return [active];
+  return sorted.length > 0 ? [sorted[0]] : [{ data: {} }];
 }
 
 /** Get the effective data object for the current view. */
@@ -401,13 +406,33 @@ function renderSessionSelector() {
   if (!select) return;
   const data = getAppData();
   select.innerHTML = '';
-  const sorted = [...data.sessions].sort((a, b) => b.id.localeCompare(a.id));
+  const sorted = [...data.sessions]
+    .filter(s => (s.drillType || 'positions') === statsDrillType)
+    .sort((a, b) => b.id.localeCompare(a.id));
   for (const s of sorted) {
     const opt = document.createElement('option');
     opt.value = s.id;
     opt.textContent = s.label;
     if (s.id === data.activeSessionId) opt.selected = true;
     select.appendChild(opt);
+  }
+}
+
+function renderStatsDrillTabs() {
+  const container = document.getElementById('stats-drill-type-tabs');
+  if (!container) return;
+  container.innerHTML = '';
+  for (const [key, info] of Object.entries(DRILL_TYPES)) {
+    const btn = document.createElement('button');
+    btn.className = 'drill-type-tab' + (key === statsDrillType ? ' active' : '');
+    btn.innerHTML = `${info.icon} ${info.label}`;
+    btn.addEventListener('click', () => {
+      statsDrillType = key;
+      renderStatsDrillTabs();
+      renderSessionSelector();
+      renderStats();
+    });
+    container.appendChild(btn);
   }
 }
 
@@ -420,6 +445,7 @@ function switchSession(id) {
 }
 
 function initStats() {
+  renderStatsDrillTabs();
   renderSessionSelector();
   renderStats();
 

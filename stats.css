@@ -1,5 +1,11 @@
 /* ===== Stats Page ===== */
 
+/* Drill type tabs on stats page */
+.stats-drill-tabs {
+  max-width: 440px;
+  padding: 6px 16px 4px;
+}
+
 /* View Tabs */
 .stats-view-tabs {
   display: flex;
@@ -287,6 +293,11 @@
 
 /* ===== Wide Screen ===== */
 @media (min-width: 768px) {
+  .stats-drill-tabs {
+    max-width: 960px;
+    padding: 6px 24px 4px;
+  }
+
   .stats-page {
     max-width: 960px;
     padding: 8px 24px 24px;

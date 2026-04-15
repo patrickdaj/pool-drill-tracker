@@ -69,6 +69,72 @@ body {
   color: #fff;
 }
 
+/* ===== Drill Type Tabs ===== */
+.drill-type-bar {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  gap: 4px;
+  padding: 6px 16px 4px;
+  background: rgba(255,255,255,0.02);
+}
+
+.drill-type-tab {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.drill-type-tab.active {
+  background: rgba(110,231,160,0.12);
+  color: #6ee7a0;
+  border-color: rgba(110,231,160,0.25);
+}
+
+/* ===== Other Drill Placeholder ===== */
+.other-drill-content {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 40px 16px;
+}
+
+.coming-soon {
+  text-align: center;
+  color: rgba(255,255,255,0.3);
+}
+
+.coming-soon-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.coming-soon h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  margin: 0 0 4px;
+}
+
+.coming-soon p {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.3);
+  margin: 0;
+}
+
 /* ===== Session Bar ===== */
 .session-bar {
   width: 100%;
@@ -691,6 +757,11 @@ body {
   .header {
     max-width: 960px;
     padding: 10px 24px 4px;
+  }
+
+  .drill-type-bar {
+    max-width: 960px;
+    padding: 6px 24px 4px;
   }
 
   .session-bar {

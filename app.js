@@ -263,9 +263,18 @@ const BALL_COLORS = {
   12: { fill: '#613583', text: '#fff',  stripe: true  },
 };
 
+// ── Drill Types ─────────────────────────────────────
+
+const DRILL_TYPES = {
+  positions: { label: 'Positions', icon: '🎯' },
+  mightyx:   { label: 'Mighty X',  icon: '✖️' },
+  wagon:     { label: 'Wagon Wheel', icon: '☸️' },
+};
+
 // ── State ───────────────────────────────────────────
 
 const state = {
+  drillType: 'positions',     // 'positions' | 'mightyx' | 'wagon'
   selectedBall: 1,
   selectedPosition: null,    // coordKey string, e.g. "2,1"
   currentInput: '2',
@@ -336,22 +345,52 @@ function saveData(data) {
 function getAppData() {
   let data = loadData();
   if (!data || !data.sessions || data.sessions.length === 0) {
-    const session = createSession();
+    const session = createSession('positions');
     data = { sessions: [session], activeSessionId: session.id };
     saveData(data);
   }
+  // Backfill drillType on legacy sessions
+  let dirty = false;
+  for (const s of data.sessions) {
+    if (!s.drillType) { s.drillType = 'positions'; dirty = true; }
+  }
   if (!data.activeSessionId || !data.sessions.find((s) => s.id === data.activeSessionId)) {
     data.activeSessionId = data.sessions[0].id;
-    saveData(data);
+    dirty = true;
   }
+  if (dirty) saveData(data);
   return data;
 }
 
-function createSession() {
+/** Get the most recent session of the given drill type, or create one. */
+function getActiveSessionForType(drillType) {
+  const data = getAppData();
+  const current = data.sessions.find(s => s.id === data.activeSessionId);
+  if (current && current.drillType === drillType) return current;
+  // Find most recent session of this type
+  const sorted = [...data.sessions].filter(s => s.drillType === drillType)
+    .sort((a, b) => b.id.localeCompare(a.id));
+  if (sorted.length > 0) {
+    data.activeSessionId = sorted[0].id;
+    saveData(data);
+    return sorted[0];
+  }
+  // None exists — create one
+  const session = createSession(drillType);
+  data.sessions.push(session);
+  data.activeSessionId = session.id;
+  saveData(data);
+  return session;
+}
+
+function createSession(drillType) {
   const now = new Date();
+  const dt = drillType || state.drillType || 'positions';
+  const typeLabel = DRILL_TYPES[dt] ? DRILL_TYPES[dt].label : dt;
   return {
     id: now.toISOString(),
     label: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
+    drillType: dt,
     data: {},
   };
 }
@@ -804,8 +843,10 @@ function renderSessionSelector() {
   const data = getAppData();
   const select = document.getElementById('session-select');
   select.innerHTML = '';
-  // Show newest first
-  const sorted = [...data.sessions].sort((a, b) => b.id.localeCompare(a.id));
+  // Show only sessions of current drill type, newest first
+  const sorted = [...data.sessions]
+    .filter(s => (s.drillType || 'positions') === state.drillType)
+    .sort((a, b) => b.id.localeCompare(a.id));
   for (const s of sorted) {
     const opt = document.createElement('option');
     opt.value = s.id;
@@ -813,6 +854,52 @@ function renderSessionSelector() {
     if (s.id === data.activeSessionId) opt.selected = true;
     select.appendChild(opt);
   }
+}
+
+function renderDrillTypeTabs() {
+  const container = document.getElementById('drill-type-tabs');
+  if (!container) return;
+  container.innerHTML = '';
+  for (const [key, info] of Object.entries(DRILL_TYPES)) {
+    const btn = document.createElement('button');
+    btn.className = 'drill-type-tab' + (key === state.drillType ? ' active' : '');
+    btn.dataset.type = key;
+    btn.innerHTML = `${info.icon} ${info.label}`;
+    btn.addEventListener('click', () => switchDrillType(key));
+    container.appendChild(btn);
+  }
+}
+
+function switchDrillType(type) {
+  if (type === state.drillType) return;
+  state.drillType = type;
+  // Switch to the most recent session of this type (or create one)
+  getActiveSessionForType(type);
+  state.selectedBall = 1;
+  state.selectedPosition = null;
+  state.currentInput = '2';
+  state.freshInput = true;
+  if (type === 'positions') resumeProgression();
+  renderAll();
+  updateDrillVisibility();
+}
+
+function updateDrillVisibility() {
+  const isPositions = state.drillType === 'positions';
+  // Main content areas — hide positions-specific UI when other drill types selected
+  const positionsContent = document.getElementById('positions-content');
+  const otherContent = document.getElementById('other-drill-content');
+  if (positionsContent) positionsContent.style.display = isPositions ? '' : 'none';
+  if (otherContent) {
+    otherContent.style.display = isPositions ? 'none' : 'flex';
+    if (!isPositions) {
+      const info = DRILL_TYPES[state.drillType];
+      otherContent.innerHTML = `<div class="coming-soon"><span class="coming-soon-icon">${info.icon}</span><h2>${info.label}</h2><p>Coming soon</p></div>`;
+    }
+  }
+  // Cycle bar adapts per drill type
+  const cycleBar = document.getElementById('cycle-bar');
+  if (cycleBar) cycleBar.style.display = isPositions ? '' : 'none';
 }
 
 function renderCycleProgress() {
@@ -852,7 +939,7 @@ function hideCycleModal() {
 function startNewCycle() {
   hideCycleModal();
   const data = getAppData();
-  const session = createSession();
+  const session = createSession(state.drillType);
   data.sessions.push(session);
   data.activeSessionId = session.id;
   saveData(data);
@@ -867,6 +954,7 @@ function startNewCycle() {
 }
 
 function renderAll() {
+  renderDrillTypeTabs();
   ensureValidPosition();
   applyShotType();
   renderBallSelector();
@@ -877,6 +965,7 @@ function renderAll() {
   renderCycleProgress();
   renderTableDiagram();
   renderShotInfo();
+  updateDrillVisibility();
 }
 
 // ── Actions ─────────────────────────────────────────
@@ -1040,12 +1129,12 @@ function showPosPopover(ballNum, posKey) {
 // ── Session Management ──────────────────────────────
 
 function newSession() {
-  if (!isCycleComplete()) {
+  if (state.drillType === 'positions' && !isCycleComplete()) {
     const { done } = getCycleProgress();
     if (!confirm(`Current cycle has ${done}/12 drills complete. Start a new cycle anyway? (Current progress will be kept in history.)`)) return;
   }
   const data = getAppData();
-  const session = createSession();
+  const session = createSession(state.drillType);
   data.sessions.push(session);
   data.activeSessionId = session.id;
   saveData(data);
@@ -1054,7 +1143,7 @@ function newSession() {
   state.currentInput = '2';
   state.freshInput = true;
   state.shotType = 'cut';
-  resumeProgression();
+  if (state.drillType === 'positions') resumeProgression();
   renderAll();
   showToast('New cycle started');
 }
