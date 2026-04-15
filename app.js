@@ -279,23 +279,23 @@ const MX_SHOTS = ['follow', 'draw', 'stop'];
 const MX_SHOT_COLORS = { follow: '#6ee7a0', draw: '#e8a23a', stop: '#7aa2f7' };
 const MX_SHOT_LABELS = { follow: 'Follow', draw: 'Draw', stop: 'Stop' };
 
-// Diagonal positions (3 diamond-crossing points between corner pockets)
-// "left" = TL→BR diagonal: (2,3), (4,2), (6,1)
-// "right" = BL→TR diagonal: (2,1), (4,2), (6,3)
+// Diagonal positions (5 diamond-crossing points between corner pockets, cols 2-6)
+// "left" = TL→BR diagonal: row = 4 - col*0.5
+// "right" = BL→TR diagonal: row = col*0.5
 const MX_DIAG_POS = {
-  left:  [{ col: 2, row: 3 }, { col: 4, row: 2 }, { col: 6, row: 1 }],
-  right: [{ col: 2, row: 1 }, { col: 4, row: 2 }, { col: 6, row: 3 }],
+  left:  [{ col: 2, row: 3 }, { col: 3, row: 2.5 }, { col: 4, row: 2 }, { col: 5, row: 1.5 }, { col: 6, row: 1 }],
+  right: [{ col: 2, row: 1 }, { col: 3, row: 1.5 }, { col: 4, row: 2 }, { col: 5, row: 2.5 }, { col: 6, row: 3 }],
 };
 // Target pocket for each diagonal (the pocket the OB is nearest to)
 const MX_DIAG_POCKET = {
   left:  { col: 0, row: 4 }, // TL pocket
   right: { col: 0, row: 0 }, // BL pocket
 };
-// OB/CB combos per diagonal, ordered by difficulty (uses 0-based position indices)
+// OB/CB combos per diagonal, ordered by difficulty (uses 0-based position indices into MX_DIAG_POS)
 const MX_COMBOS = [
-  { ob: 0, cb: 1, label: 'Short' },  // OB near pocket, CB 1 diamond away
-  { ob: 1, cb: 2, label: 'Medium' }, // OB at center, CB 1 diamond away
-  { ob: 0, cb: 2, label: 'Long' },   // OB near pocket, CB 2 diamonds away
+  { ob: 0, cb: 2, label: 'Short' },  // OB near pocket, CB 2 diamonds away
+  { ob: 1, cb: 3, label: 'Medium' }, // OB 1 dia out, CB 2 diamonds away (center of table)
+  { ob: 0, cb: 4, label: 'Long' },   // OB near pocket, CB 4 diamonds away
 ];
 const MX_COMBO_LABELS = { 1: 'Short', 2: 'Medium', 3: 'Long' };
 
@@ -766,10 +766,9 @@ function renderTableDiagram() {
   const zoneX = dx(6) + dSpaceX / 2;
   svg += `<line x1="${zoneX}" y1="${margin + railW + 2}" x2="${zoneX}" y2="${margin + railW + innerH - 2}" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4,4"/>`;
 
-  // Diamond markers on rails (skip pockets + positions adjacent to corner pockets)
+  // Diamond markers on rails (skip pocket positions)
   const pocketSet = new Set(pockets.map(([c, r]) => c + ',' + r));
   for (let c = 0; c <= 8; c++) {
-    if (c === 1 || c === 7) continue;
     if (!pocketSet.has(c + ',4')) {
       svg += `<circle cx="${dx(c)}" cy="${margin + 4}" r="2" fill="#8d6e63"/>`;
     }
@@ -1470,9 +1469,8 @@ function renderMxTableSvg() {
     svg += `<circle cx="${dx(c)}" cy="${dy(r)}" r="8" fill="#0a0a0a"/>`;
   }
 
-  // Diamond markers on rails (skip pockets + positions adjacent to corner pockets)
+  // Diamond markers on rails (skip pocket positions)
   for (let c = 0; c <= 8; c++) {
-    if (c === 1 || c === 7) continue;
     if (!pocketSet.has(c + ',4')) svg += `<circle cx="${dx(c)}" cy="${margin + 4}" r="2" fill="#8d6e63"/>`;
     if (!pocketSet.has(c + ',0')) svg += `<circle cx="${dx(c)}" cy="${margin + 2 * railW + innerH - 4}" r="2" fill="#8d6e63"/>`;
   }
@@ -1498,8 +1496,8 @@ function renderMxTableSvg() {
     svg += `<circle cx="${dx(pos.col)}" cy="${dy(pos.row)}" r="4" fill="rgba(255,255,255,0.06)"/>`;
   }
 
-  // All 3 position markers on active diagonal (dimmed)
-  for (let i = 0; i < 3; i++) {
+  // All position markers on active diagonal (dimmed)
+  for (let i = 0; i < diagPos.length; i++) {
     const pos = diagPos[i];
     const isOb = i === combo.ob;
     const isCb = i === combo.cb;
