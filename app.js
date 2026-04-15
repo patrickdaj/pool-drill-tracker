@@ -311,48 +311,49 @@ function mxKey(side, level, shot) { return `${side}-${level}-${shot}`; }
 
 // ── Wagon Wheel Constants ───────────────────────────
 
-// All 18 diamond positions clockwise from just right of TS pocket
-const WW_ALL_DIAMONDS = [
+// All 24 diamond positions clockwise (pockets included as diamonds)
+const WW_POSITIONS = [
   { col: 5, row: 4 }, { col: 6, row: 4 }, { col: 7, row: 4 },  // top rail right
+  { col: 8, row: 4 },                                            // TR pocket
   { col: 8, row: 3 }, { col: 8, row: 2 }, { col: 8, row: 1 },  // right rail
+  { col: 8, row: 0 },                                            // BR pocket
   { col: 7, row: 0 }, { col: 6, row: 0 }, { col: 5, row: 0 },  // bottom rail right
+  { col: 4, row: 0 },                                            // BS pocket
   { col: 3, row: 0 }, { col: 2, row: 0 }, { col: 1, row: 0 },  // bottom rail left
+  { col: 0, row: 0 },                                            // BL pocket
   { col: 0, row: 1 }, { col: 0, row: 2 }, { col: 0, row: 3 },  // left rail
+  { col: 0, row: 4 },                                            // TL pocket
   { col: 1, row: 4 }, { col: 2, row: 4 }, { col: 3, row: 4 },  // top rail left
+  { col: 4, row: 4 },                                            // TS pocket
 ];
+// Back-compat alias for stats.js
+const WW_ALL_DIAMONDS = WW_POSITIONS;
 
-// Right side: 12 positions clockwise from TS (top→right→bottom all the way)
-const WW_RIGHT = WW_ALL_DIAMONDS.slice(0, 12);
-// Left side: 12 positions CCW from BS (bottom-left→left rail→top all the way)
-const WW_LEFT = [
-  { col: 3, row: 0 }, { col: 2, row: 0 }, { col: 1, row: 0 },  // bottom rail left
-  { col: 0, row: 1 }, { col: 0, row: 2 }, { col: 0, row: 3 },  // left rail
-  { col: 1, row: 4 }, { col: 2, row: 4 }, { col: 3, row: 4 },  // top rail left
-  { col: 5, row: 4 }, { col: 6, row: 4 }, { col: 7, row: 4 },  // top rail right
-];
-
-const WW_POSITIONS = {
-  right: WW_RIGHT,
-  left:  WW_LEFT,
-  full:  WW_ALL_DIAMONDS,
-};
-
-const WW_TARGETS = {
-  right: { col: 4, row: 4, label: 'TS' },  // top side pocket
-  left:  { col: 4, row: 0, label: 'BS' },  // bottom side pocket
-  full:  null, // determined per position
-};
-
-const WW_SIDES = ['right', 'left', 'full'];
+const WW_TOTAL = WW_POSITIONS.length; // 24
 
 function wwKey(pos) { return `ww-${pos.col}-${pos.row}`; }
-function wwCurrentPositions() { return WW_POSITIONS[state.wagonSide]; }
-function wwCurrentTotal() { return wwCurrentPositions().length; }
 
-function wwTargetForPos(pos) {
-  if (state.wagonSide !== 'full') return WW_TARGETS[state.wagonSide];
-  // Full mode: right half → TS, left half → BS
-  return (pos.col > 4 || (pos.col === 8)) ? { col: 4, row: 4 } : (pos.col < 4 || pos.col === 0) ? { col: 4, row: 0 } : (pos.row >= 2 ? { col: 4, row: 4 } : { col: 4, row: 0 });
+// Shot setup: target pocket, OB (one diamond from pocket on rail), CB (near center)
+function wwShotSetup(posIdx) {
+  const pos = WW_POSITIONS[posIdx];
+  // Right half (idx 0-11) → target TS pocket; Left half (idx 12-23) → target BS pocket
+  // Exception: if position IS the target pocket, use the other side pocket
+  const isRight = posIdx <= 11;
+  let target = isRight ? { col: 4, row: 4 } : { col: 4, row: 0 };
+  if (pos.col === target.col && pos.row === target.row) {
+    target = isRight ? { col: 4, row: 0 } : { col: 4, row: 4 };
+  }
+  // OB: one diamond from target along the rail toward position side
+  let obCol = isRight ? target.col + 1 : target.col - 1;
+  let obRow = target.row;
+  // If OB overlaps the position itself, put it on the other side
+  if (obCol === pos.col && obRow === pos.row) {
+    obCol = isRight ? target.col - 1 : target.col + 1;
+  }
+  // CB: near center, slight offset to create angle toward OB
+  const cbOffX = (obCol > target.col) ? 0.7 : -0.7;
+  const cbRow = target.row === 4 ? 2.3 : 1.7;
+  return { target, ob: { col: obCol, row: obRow }, cb: { col: target.col + cbOffX, row: cbRow } };
 }
 
 // ── State ───────────────────────────────────────────
@@ -372,8 +373,7 @@ const state = {
   mxShot: 'follow',
   mxRandom: false,           // random mode for mighty x
   // Wagon Wheel state
-  wagonSide: 'right',        // 'right' | 'left' | 'full'
-  wagonSpoke: 0,             // index into wwCurrentPositions()
+  wagonSpoke: 0,             // index into WW_POSITIONS
   wagonRandom: false,
 };
 
@@ -671,15 +671,13 @@ function mxResumeProgression() {
 // ── Wagon Wheel Data Functions ──────────────────────
 
 function getWagonEntry(idx) {
-  const positions = wwCurrentPositions();
-  const pos = positions[idx];
+  const pos = WW_POSITIONS[idx];
   const session = getActiveSession();
   return session.data[wwKey(pos)] || null;
 }
 
 function saveWagonEntry(idx, attempts) {
-  const positions = wwCurrentPositions();
-  const pos = positions[idx];
+  const pos = WW_POSITIONS[idx];
   const data = getAppData();
   const session = data.sessions.find(s => s.id === data.activeSessionId);
   const key = wwKey(pos);
@@ -694,36 +692,32 @@ function isWagonSpokeComplete(idx) {
 }
 
 function isWagonCycleComplete() {
-  const positions = wwCurrentPositions();
-  for (let i = 0; i < positions.length; i++) {
+  for (let i = 0; i < WW_TOTAL; i++) {
     if (!isWagonSpokeComplete(i)) return false;
   }
   return true;
 }
 
 function getWagonCycleProgress() {
-  const positions = wwCurrentPositions();
   let done = 0;
-  for (let i = 0; i < positions.length; i++) {
+  for (let i = 0; i < WW_TOTAL; i++) {
     if (isWagonSpokeComplete(i)) done++;
   }
-  return { done, total: positions.length };
+  return { done, total: WW_TOTAL };
 }
 
 function getWagonSessionTotal() {
   const session = getActiveSession();
-  const positions = wwCurrentPositions();
   let total = 0;
-  for (let i = 0; i < positions.length; i++) {
-    const entry = session.data[wwKey(positions[i])];
+  for (let i = 0; i < WW_TOTAL; i++) {
+    const entry = session.data[wwKey(WW_POSITIONS[i])];
     if (entry && entry.attempts) total += entry.attempts;
   }
   return total;
 }
 
 function wagonResumeProgression() {
-  const positions = wwCurrentPositions();
-  for (let i = 0; i < positions.length; i++) {
+  for (let i = 0; i < WW_TOTAL; i++) {
     if (!isWagonSpokeComplete(i)) {
       state.wagonSpoke = i;
       return;
@@ -732,9 +726,8 @@ function wagonResumeProgression() {
 }
 
 function wagonPickRandom() {
-  const positions = wwCurrentPositions();
   const incomplete = [];
-  for (let i = 0; i < positions.length; i++) {
+  for (let i = 0; i < WW_TOTAL; i++) {
     if (!isWagonSpokeComplete(i)) incomplete.push(i);
   }
   if (incomplete.length === 0) return;
@@ -1720,31 +1713,33 @@ function renderWagonTableSvg() {
     if (!pocketSet.has('8,' + r)) svg += `<circle cx="${margin + 2 * railW + innerW - 4}" cy="${dy(r)}" r="2" fill="#8d6e63"/>`;
   }
 
-  const positions = wwCurrentPositions();
-  const currentPos = positions[state.wagonSpoke];
-  const target = state.wagonSide === 'full' ? wwTargetForPos(currentPos) : WW_TARGETS[state.wagonSide];
+  const currentPos = WW_POSITIONS[state.wagonSpoke];
+  const setup = wwShotSetup(state.wagonSpoke);
 
   // Highlight target pocket
-  if (target) {
-    svg += `<circle cx="${dx(target.col)}" cy="${dy(target.row)}" r="12" fill="none" stroke="#6ee7a0" stroke-width="2.5" stroke-opacity="0.7"/>`;
-    // OB ball hanging in target pocket
-    svg += `<circle cx="${dx(target.col)}" cy="${dy(target.row)}" r="7" fill="#e53935" stroke="#b71c1c" stroke-width="1"/>`;
-    svg += `<ellipse cx="${dx(target.col) - 1.5}" cy="${dy(target.row) - 1.5}" rx="2" ry="1.5" fill="rgba(255,255,255,0.3)" transform="rotate(-30 ${dx(target.col) - 1.5} ${dy(target.row) - 1.5})"/>`;
-  }
+  svg += `<circle cx="${dx(setup.target.col)}" cy="${dy(setup.target.row)}" r="12" fill="none" stroke="#6ee7a0" stroke-width="2.5" stroke-opacity="0.7"/>`;
 
-  // All positions as markers with spokes from target
-  for (let i = 0; i < positions.length; i++) {
-    const pos = positions[i];
+  // Dashed aim line: CB → OB → pocket
+  svg += `<line x1="${dx(setup.cb.col)}" y1="${dy(setup.cb.row)}" x2="${dx(setup.ob.col)}" y2="${dy(setup.ob.row)}" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="3,3"/>`;
+  svg += `<line x1="${dx(setup.ob.col)}" y1="${dy(setup.ob.row)}" x2="${dx(setup.target.col)}" y2="${dy(setup.target.row)}" stroke="rgba(110,231,160,0.3)" stroke-width="1" stroke-dasharray="3,3"/>`;
+
+  // OB (red ball) one diamond from pocket on rail
+  svg += `<circle cx="${dx(setup.ob.col)}" cy="${dy(setup.ob.row)}" r="7" fill="#e53935" stroke="#b71c1c" stroke-width="1"/>`;
+  svg += `<ellipse cx="${dx(setup.ob.col) - 1.5}" cy="${dy(setup.ob.row) - 1.5}" rx="2" ry="1.5" fill="rgba(255,255,255,0.3)" transform="rotate(-30 ${dx(setup.ob.col) - 1.5} ${dy(setup.ob.row) - 1.5})"/>`;
+
+  // CB (white ball) near center
+  svg += `<circle cx="${dx(setup.cb.col)}" cy="${dy(setup.cb.row)}" r="7" fill="#f5f5f5" stroke="#bbb" stroke-width="1"/>`;
+  svg += `<ellipse cx="${dx(setup.cb.col) - 1.5}" cy="${dy(setup.cb.row) - 1.5}" rx="2" ry="1.5" fill="rgba(255,255,255,0.6)" transform="rotate(-30 ${dx(setup.cb.col) - 1.5} ${dy(setup.cb.row) - 1.5})"/>`;
+
+  // All position markers
+  for (let i = 0; i < WW_TOTAL; i++) {
+    const pos = WW_POSITIONS[i];
     const sx = dx(pos.col), sy = dy(pos.row);
     const complete = isWagonSpokeComplete(i);
     const isCurrent = i === state.wagonSpoke;
-    const posTarget = state.wagonSide === 'full' ? wwTargetForPos(pos) : target;
 
-    // Spoke line from position to target
-    if (posTarget) {
-      const strokeColor = complete ? 'rgba(110,231,160,0.25)' : isCurrent ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.04)';
-      svg += `<line x1="${dx(posTarget.col)}" y1="${dy(posTarget.row)}" x2="${sx}" y2="${sy}" stroke="${strokeColor}" stroke-width="1" stroke-dasharray="3,3"/>`;
-    }
+    // Skip drawing position marker if it overlaps with OB
+    if (pos.col === setup.ob.col && pos.row === setup.ob.row && !isCurrent) continue;
 
     const r = isCurrent ? 13 : 10;
     let fill;
@@ -1779,11 +1774,11 @@ function wwPosLabel(pos) {
 function renderWagonWheel() {
   const container = document.getElementById('other-drill-content');
   if (!container) return;
-  const positions = wwCurrentPositions();
   const entry = getWagonEntry(state.wagonSpoke);
-  const currentPos = positions[state.wagonSpoke];
+  const currentPos = WW_POSITIONS[state.wagonSpoke];
   const { done, total } = getWagonCycleProgress();
-  const target = state.wagonSide === 'full' ? wwTargetForPos(currentPos) : WW_TARGETS[state.wagonSide];
+  const setup = wwShotSetup(state.wagonSpoke);
+  const targetLabel = (setup.target.col === 4 && setup.target.row === 4) ? 'Top Side' : 'Bottom Side';
 
   let html = `<div class="drill-layout">`;
 
@@ -1792,25 +1787,16 @@ function renderWagonWheel() {
   html += `<div class="table-container" id="wagon-table-container">${renderWagonTableSvg()}</div>`;
   html += `<div class="drill-info">`;
   html += `Position <strong>${state.wagonSpoke + 1}</strong>/${total} · ${wwPosLabel(currentPos)}`;
-  if (target) html += ` → <span style="color:#6ee7a0">${target.col === 4 && target.row === 4 ? 'Top Side' : 'Bottom Side'} Pocket</span>`;
+  html += ` → <span style="color:#6ee7a0">${targetLabel} Pocket</span>`;
   html += `</div>`;
   html += `</div>`;
 
   // Right: Controls
   html += `<div class="drill-right">`;
 
-  // Side selector
-  html += `<div class="drill-selector"><div class="selector-label">Side</div><div class="drill-toggle">`;
-  for (const side of WW_SIDES) {
-    const label = side === 'right' ? 'Right' : side === 'left' ? 'Left' : 'Full';
-    html += `<button class="drill-toggle-btn ${side === state.wagonSide ? 'active' : ''}" data-ww-side="${side}">${label}</button>`;
-  }
-  html += `</div></div>`;
-
-  // Position selector grid
-  const gridCols = total <= 12 ? 6 : 6;
-  html += `<div class="drill-selector"><div class="selector-label">Position</div><div class="wagon-spoke-grid" style="grid-template-columns: repeat(${gridCols}, 1fr)">`;
-  for (let i = 0; i < positions.length; i++) {
+  // Position selector grid (4 cols for 24 positions)
+  html += `<div class="drill-selector"><div class="selector-label">Position</div><div class="wagon-spoke-grid" style="grid-template-columns: repeat(6, 1fr)">`;
+  for (let i = 0; i < WW_TOTAL; i++) {
     const complete = isWagonSpokeComplete(i);
     html += `<button class="wagon-spoke-btn ${i === state.wagonSpoke ? 'selected' : ''} ${complete ? 'done' : ''}" data-spoke="${i}">${complete ? '✓' : i + 1}</button>`;
   }
@@ -1839,7 +1825,7 @@ function renderWagonWheel() {
   html += `</div>`;
   html += `</div>`; // drill-right
 
-  // Cycle progress bar (12 or 18 positions)
+  // Cycle progress bar
   const pct = total > 0 ? (done / total * 100) : 0;
   html += `<div class="drill-progress mx-progress">`;
   html += `<div class="mx-progress-bar"><div class="mx-progress-fill" style="width:${pct}%"></div></div>`;
@@ -1905,15 +1891,6 @@ function attachDrillHandlers(type) {
 
   // Wagon-specific selectors
   if (type === 'wagon') {
-    container.querySelectorAll('[data-ww-side]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.wagonSide = btn.dataset.wwSide;
-        state.wagonSpoke = 0;
-        wagonResumeProgression();
-        state.currentInput = '2'; state.freshInput = true;
-        renderAll();
-      });
-    });
     container.querySelectorAll('[data-spoke]').forEach(btn => {
       if (btn.classList.contains('spoke-marker')) return; // SVG handled separately
       btn.addEventListener('click', () => {
@@ -1995,7 +1972,7 @@ function pressSaveWagon() {
   state.freshInput = true;
   renderAll();
 
-  const wwTotal = wwCurrentTotal();
+  const wwTotal = WW_TOTAL;
   if (isWagonCycleComplete()) {
     showDrillCycleComplete(`All ${wwTotal} Wagon Wheel positions finished!`, wwTotal, getWagonSessionTotal());
   }
@@ -2101,4 +2078,25 @@ function init() {
 document.addEventListener('DOMContentLoaded', async () => {
   await loadPositionConfigs();
   if (document.getElementById('btn-save')) init();
+
+  // Swipe navigation between drill tabs
+  let touchStartX = 0, touchStartY = 0;
+  const SWIPE_THRESHOLD = 60;
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    const dxSwipe = e.changedTouches[0].clientX - touchStartX;
+    const dySwipe = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dxSwipe) < SWIPE_THRESHOLD) return;
+    if (Math.abs(dySwipe) > Math.abs(dxSwipe) * 0.6) return; // too vertical
+    const types = Object.keys(DRILL_TYPES);
+    const idx = types.indexOf(state.drillType);
+    if (dxSwipe < 0) {
+      switchDrillType(types[(idx + 1) % types.length]);
+    } else {
+      switchDrillType(types[(idx - 1 + types.length) % types.length]);
+    }
+  }, { passive: true });
 });

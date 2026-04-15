@@ -640,9 +640,9 @@ body {
 }
 
 .cycle-count {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.4);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.6);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -895,9 +895,9 @@ body {
 }
 .mx-progress-bar {
   flex: 1;
-  height: 6px;
-  background: rgba(255,255,255,0.08);
-  border-radius: 3px;
+  height: 10px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 5px;
   overflow: hidden;
 }
 .mx-progress-fill {
