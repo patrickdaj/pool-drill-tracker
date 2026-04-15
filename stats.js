@@ -465,7 +465,7 @@ function renderMxStats() {
     const pct = avg > 0 ? hitPct(avg) : 0;
     return `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${label} (${d.count})</div></div>`;
   };
-  tg.innerHTML = sideHtml('↗ Left', s.bySide.left) + sideHtml('↖ Right', s.bySide.right);
+  tg.innerHTML = sideHtml('↘ TL→BR', s.bySide.left) + sideHtml('↗ BL→TR', s.bySide.right);
   tg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'By Diagonal';
 
   // By Shot Type → use angle grid
@@ -491,10 +491,10 @@ function renderMxStats() {
     const d = s.byLevel[level];
     const avg = d.count > 0 ? d.sum / d.count : 0;
     const pct = avg > 0 ? hitPct(avg) : 0;
-    levelHtml += `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">Level ${level} (${d.count})</div></div>`;
+    levelHtml += `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${MX_COMBO_LABELS[level]} (${d.count})</div></div>`;
   }
   dg.innerHTML = levelHtml;
-  dg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'By Distance Level';
+  dg.closest('.stats-section').querySelector('.stats-section-title').textContent = 'By Position';
   dg.closest('.stats-section').style.display = '';
 
   // Hide irrelevant sections

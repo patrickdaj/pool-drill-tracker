@@ -274,10 +274,30 @@ const DRILL_TYPES = {
 // ── Mighty X Constants ──────────────────────────────
 
 const MX_SIDES = ['left', 'right'];
-const MX_LEVELS = [1, 2];
+const MX_LEVELS = [1, 2, 3];
 const MX_SHOTS = ['follow', 'draw', 'stop'];
 const MX_SHOT_COLORS = { follow: '#6ee7a0', draw: '#e8a23a', stop: '#7aa2f7' };
 const MX_SHOT_LABELS = { follow: 'Follow', draw: 'Draw', stop: 'Stop' };
+
+// Diagonal positions (3 diamond-crossing points between corner pockets)
+// "left" = TL→BR diagonal: (2,3), (4,2), (6,1)
+// "right" = BL→TR diagonal: (2,1), (4,2), (6,3)
+const MX_DIAG_POS = {
+  left:  [{ col: 2, row: 3 }, { col: 4, row: 2 }, { col: 6, row: 1 }],
+  right: [{ col: 2, row: 1 }, { col: 4, row: 2 }, { col: 6, row: 3 }],
+};
+// Target pocket for each diagonal (the pocket the OB is nearest to)
+const MX_DIAG_POCKET = {
+  left:  { col: 0, row: 4 }, // TL pocket
+  right: { col: 0, row: 0 }, // BL pocket
+};
+// OB/CB combos per diagonal, ordered by difficulty (uses 0-based position indices)
+const MX_COMBOS = [
+  { ob: 0, cb: 1, label: 'Short' },  // OB near pocket, CB 1 diamond away
+  { ob: 1, cb: 2, label: 'Medium' }, // OB at center, CB 1 diamond away
+  { ob: 0, cb: 2, label: 'Long' },   // OB near pocket, CB 2 diamonds away
+];
+const MX_COMBO_LABELS = { 1: 'Short', 2: 'Medium', 3: 'Long' };
 
 const MX_TOTAL = MX_SIDES.length * MX_LEVELS.length * MX_SHOTS.length;
 function mxKey(side, level, shot) { return `${side}-${level}-${shot}`; }
@@ -1459,75 +1479,52 @@ function renderMxTableSvg() {
     if (!pocketSet.has('8,' + r)) svg += `<circle cx="${margin + 2 * railW + innerW - 4}" cy="${dy(r)}" r="2" fill="#8d6e63"/>`;
   }
 
-  // X diagonal lines — highlight the active diagonal
-  const isLeft = state.mxSide === 'left';
-  // BL↔TR diagonal = "left" side
-  svg += `<line x1="${dx(0.3)}" y1="${dy(0.15)}" x2="${dx(7.7)}" y2="${dy(3.85)}" stroke="rgba(255,255,255,${isLeft ? '0.15' : '0.05'})" stroke-width="${isLeft ? '2' : '1.5'}" stroke-dasharray="6,4"/>`;
-  // TL↔BR diagonal = "right" side
-  svg += `<line x1="${dx(0.3)}" y1="${dy(3.85)}" x2="${dx(7.7)}" y2="${dy(0.15)}" stroke="rgba(255,255,255,${!isLeft ? '0.15' : '0.05'})" stroke-width="${!isLeft ? '2' : '1.5'}" stroke-dasharray="6,4"/>`;
-
-  // Center OB — bright red ball
-  svg += `<circle cx="${dx(4)}" cy="${dy(2)}" r="8" fill="#e53935" stroke="#b71c1c" stroke-width="1.5"/>`;
-  svg += `<ellipse cx="${dx(4) - 2}" cy="${dy(2) - 2}" rx="3" ry="2" fill="rgba(255,255,255,0.3)" transform="rotate(-30 ${dx(4) - 2} ${dy(2) - 2})"/>`;
-
-  // CB positions — 2 levels per arm, aligned with diamonds
-  const arms = { 'left-upper': [], 'left-lower': [], 'right-upper': [], 'right-lower': [] };
-  for (let i = 0; i < 2; i++) {
-    const t = (i + 1) / 4; // t = 0.25, 0.5
-    arms['left-upper'].push({ col: 4 - t * 4, row: 2 + t * 2 });
-    arms['left-lower'].push({ col: 4 - t * 4, row: 2 - t * 2 });
-    arms['right-upper'].push({ col: 4 + t * 4, row: 2 + t * 2 });
-    arms['right-lower'].push({ col: 4 + t * 4, row: 2 - t * 2 });
-  }
-
-  // Diagonal pairing:
-  // "left"  = BL↔TR diagonal: left-lower arm + right-upper arm
-  // "right" = TL↔BR diagonal: left-upper arm + right-lower arm
   const side = state.mxSide;
-  const activeArms = side === 'left'
-    ? [arms['right-upper'], arms['left-lower']]
-    : [arms['left-upper'], arms['right-lower']];
-  const inactiveArms = side === 'left'
-    ? [arms['left-upper'], arms['right-lower']]
-    : [arms['right-upper'], arms['left-lower']];
+  const isLeft = side === 'left';
 
-  // Dimmed markers for inactive diagonal
-  for (const arm of inactiveArms) {
-    for (let li = 0; li < 2; li++) {
-      const pos = arm[li];
-      svg += `<circle cx="${dx(pos.col)}" cy="${dy(pos.row)}" r="4" fill="rgba(255,255,255,0.06)"/>`;
+  // X diagonal lines — highlight active diagonal
+  // "left" = TL↔BR, "right" = BL↔TR
+  svg += `<line x1="${dx(0.3)}" y1="${dy(3.85)}" x2="${dx(7.7)}" y2="${dy(0.15)}" stroke="rgba(255,255,255,${isLeft ? '0.15' : '0.05'})" stroke-width="${isLeft ? '2' : '1.5'}" stroke-dasharray="6,4"/>`;
+  svg += `<line x1="${dx(0.3)}" y1="${dy(0.15)}" x2="${dx(7.7)}" y2="${dy(3.85)}" stroke="rgba(255,255,255,${!isLeft ? '0.15' : '0.05'})" stroke-width="${!isLeft ? '2' : '1.5'}" stroke-dasharray="6,4"/>`;
+
+  const diagPos = MX_DIAG_POS[side];
+  const otherPos = MX_DIAG_POS[side === 'left' ? 'right' : 'left'];
+  const combo = MX_COMBOS[state.mxLevel - 1];
+
+  // Dimmed position dots for inactive diagonal
+  for (const pos of otherPos) {
+    svg += `<circle cx="${dx(pos.col)}" cy="${dy(pos.row)}" r="4" fill="rgba(255,255,255,0.06)"/>`;
+  }
+
+  // All 3 position markers on active diagonal (dimmed)
+  for (let i = 0; i < 3; i++) {
+    const pos = diagPos[i];
+    const isOb = i === combo.ob;
+    const isCb = i === combo.cb;
+    if (!isOb && !isCb) {
+      svg += `<circle cx="${dx(pos.col)}" cy="${dy(pos.row)}" r="4" fill="rgba(255,255,255,0.12)"/>`;
     }
   }
 
-  // Active diagonal markers
-  for (let li = 0; li < 2; li++) {
-    const level = li + 1;
-    let doneCount = 0;
-    for (const shot of MX_SHOTS) {
-      if (isMxEntryComplete(mxKey(side, level, shot))) doneCount++;
-    }
-    const isCurrent = level === state.mxLevel;
-    const fill = doneCount === 3 ? '#6ee7a0' : doneCount > 0 ? 'rgba(110,231,160,0.4)' : 'rgba(255,255,255,0.15)';
+  // OB — red ball at current combo's OB position
+  const obPos = diagPos[combo.ob];
+  const obX = dx(obPos.col), obY = dy(obPos.row);
+  svg += `<circle cx="${obX}" cy="${obY}" r="8" fill="#e53935" stroke="#b71c1c" stroke-width="1.5"/>`;
+  svg += `<ellipse cx="${obX - 2}" cy="${obY - 2}" rx="3" ry="2" fill="rgba(255,255,255,0.3)" transform="rotate(-30 ${obX - 2} ${obY - 2})"/>`;
 
-    for (const arm of activeArms) {
-      const pos = arm[li];
-      const x = dx(pos.col), y = dy(pos.row);
-      if (isCurrent) {
-        svg += `<circle cx="${x}" cy="${y}" r="10" fill="#f5f5f5" stroke="#fff" stroke-width="2"/>`;
-        svg += `<ellipse cx="${x - 2}" cy="${y - 2}" rx="3" ry="2" fill="rgba(255,255,255,0.6)" transform="rotate(-30 ${x - 2} ${y - 2})"/>`;
-        svg += `<text x="${x}" y="${y + 3.5}" text-anchor="middle" font-size="8" font-weight="700" fill="#333" style="pointer-events:none">▶</text>`;
-      } else {
-        svg += `<circle cx="${x}" cy="${y}" r="7" fill="${fill}"/>`;
-        if (doneCount > 0) {
-          svg += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-size="7" font-weight="700" fill="#0a0a0a" style="pointer-events:none">${doneCount}</text>`;
-        }
-      }
-    }
+  // CB — white ball at current combo's CB position
+  const cbPos = diagPos[combo.cb];
+  const cbX = dx(cbPos.col), cbY = dy(cbPos.row);
+  svg += `<circle cx="${cbX}" cy="${cbY}" r="10" fill="#f5f5f5" stroke="#fff" stroke-width="2"/>`;
+  svg += `<ellipse cx="${cbX - 2}" cy="${cbY - 2}" rx="3" ry="2" fill="rgba(255,255,255,0.6)" transform="rotate(-30 ${cbX - 2} ${cbY - 2})"/>`;
 
-    // Level label on first (upper) arm
-    const uPos = activeArms[0][li];
-    svg += `<text x="${dx(uPos.col)}" y="${dy(uPos.row) - (isCurrent ? 14 : 10)}" text-anchor="middle" font-size="6" font-weight="600" fill="rgba(255,255,255,0.3)" style="pointer-events:none">L${level}</text>`;
-  }
+  // Arrow from CB toward OB to show shot direction
+  const midX = (obX + cbX) / 2, midY = (obY + cbY) / 2;
+  svg += `<line x1="${cbX}" y1="${cbY}" x2="${midX}" y2="${midY}" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" marker-end="none"/>`;
+
+  // Target pocket indicator
+  const pkt = MX_DIAG_POCKET[side];
+  svg += `<circle cx="${dx(pkt.col)}" cy="${dy(pkt.row)}" r="8" fill="none" stroke="#e53935" stroke-width="2" stroke-dasharray="3,2"/>`;
 
   svg += '</svg>';
   return svg;
@@ -1547,8 +1544,9 @@ function renderMightyX() {
   html += `<div class="table-container">${renderMxTableSvg()}</div>`;
   // Current entry info
   html += `<div class="drill-info">`;
-  html += `<span style="color:${state.mxSide === 'left' ? '#7aa2f7' : '#e8a23a'}">${state.mxSide === 'left' ? '↗ Left' : '↖ Right'}</span>`;
-  html += ` · Level ${state.mxLevel} · `;
+  const comboInfo = MX_COMBOS[state.mxLevel - 1];
+  html += `<span style="color:${state.mxSide === 'left' ? '#7aa2f7' : '#e8a23a'}">${state.mxSide === 'left' ? '↘ TL→BR' : '↗ BL→TR'}</span>`;
+  html += ` · ${comboInfo.label} · `;
   html += `<span style="color:${MX_SHOT_COLORS[state.mxShot]}">${MX_SHOT_LABELS[state.mxShot]}</span>`;
   html += `</div>`;
   html += `</div>`;
@@ -1559,15 +1557,15 @@ function renderMightyX() {
   // Diagonal selector
   html += `<div class="drill-selector"><div class="selector-label">Diagonal</div><div class="drill-toggle">`;
   for (const side of MX_SIDES) {
-    html += `<button class="drill-toggle-btn ${side === state.mxSide ? 'active' : ''}" data-mx-side="${side}">${side === 'left' ? '↗ Left' : '↖ Right'}</button>`;
+    html += `<button class="drill-toggle-btn ${side === state.mxSide ? 'active' : ''}" data-mx-side="${side}">${side === 'left' ? '↘ TL→BR' : '↗ BL→TR'}</button>`;
   }
   html += `</div></div>`;
 
-  // Level selector
-  html += `<div class="drill-selector"><div class="selector-label">Distance Level</div><div class="drill-toggle">`;
+  // Position combo selector
+  html += `<div class="drill-selector"><div class="selector-label">OB / CB Position</div><div class="drill-toggle">`;
   for (const level of MX_LEVELS) {
     const allDone = MX_SHOTS.every(s => isMxEntryComplete(mxKey(state.mxSide, level, s)));
-    html += `<button class="drill-toggle-btn ${level === state.mxLevel ? 'active' : ''} ${allDone ? 'done' : ''}" data-mx-level="${level}">${level}◆</button>`;
+    html += `<button class="drill-toggle-btn ${level === state.mxLevel ? 'active' : ''} ${allDone ? 'done' : ''}" data-mx-level="${level}">${MX_COMBO_LABELS[level]}</button>`;
   }
   html += `</div></div>`;
 
