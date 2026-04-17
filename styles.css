@@ -835,9 +835,9 @@ body {
 
 /* Positions mode toggle */
 .pos-mode-toggle {
-  max-width: 260px;
-  margin: 0 auto;
-  padding: 4px 0;
+  width: 100%;
+  max-width: 440px;
+  padding: 4px 16px;
 }
 
 /* Wagon spoke grid */
