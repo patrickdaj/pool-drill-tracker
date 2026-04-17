@@ -360,198 +360,179 @@ const state = {
   freshInput: true,           // true = first digit replaces default
   shotType: 'cut',
   direction: 'L',            // 'L' or 'R' — only matters for dual positions
-  posRandom: false,          // random mode for positions drill
+  posMode: 'weighted',        // 'seq' | 'rand' | 'weighted'
   // Mighty X state
   mxSide: 'left',
   mxLevel: 1,
   mxShot: 'follow',
-  mxRandom: false,           // random mode for mighty x
+  mxMode: 'weighted',         // 'seq' | 'rand' | 'weighted'
   // Wagon Wheel state
   wagonSpoke: 0,             // index into WW_POSITIONS
-  wagonRandom: false,
+  wagonMode: 'weighted',      // 'seq' | 'rand' | 'weighted'
 };
 
-// ── Persistence ─────────────────────────────────────
+// ── Persistence (Supabase + in-memory cache) ───────
 
-const STORAGE_KEY = 'poolDrillData';
-const CONFIG_KEY = 'poolDrillConfig';
+const MASTERED_CYCLE_SKIP = 3;   // mastered shots skip this many cycles
+const ROLLING_AVG_COUNT = 10;    // rolling average window size
 
-function loadConfig() {
-  try {
-    const raw = localStorage.getItem(CONFIG_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return { posLabels: {}, posSkipped: {} };
+const _cache = {
+  sessions: [],          // All session objects {id, label, drill_type, created_at}
+  entries: {},           // sessionId → { drillKey: {attempts, type, note} }
+  config: { posLabels: {}, posSkipped: {} },
+};
+
+function activeSessionId() {
+  return getActiveSessionId(state.drillType);
 }
 
-function saveConfig(cfg) {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+function activeSession() {
+  const sid = activeSessionId();
+  return _cache.sessions.find(s => s.id === sid);
 }
+
+function activeEntries() {
+  return _cache.entries[activeSessionId()] || {};
+}
+
+function sessionsForType(drillType) {
+  return _cache.sessions
+    .filter(s => s.drill_type === drillType)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+// Drill key helpers
+function posDrillKey(ballNum, posKey, direction) {
+  const effectiveKey = direction ? posKey + ':' + direction : posKey;
+  return `pos-${ballNum}-${effectiveKey}`;
+}
+
+// Load all data into _cache on startup
+let _appDataLoaded = false;
+async function loadAppData() {
+  if (_appDataLoaded) return;
+  _appDataLoaded = true;
+  await dbInit();
+  _cache.config = await dbGetConfig();
+  _cache.sessions = await dbGetAllSessions();
+
+  for (const dt of ['positions', 'mightyx', 'wagon']) {
+    let sid = getActiveSessionId(dt);
+    const typed = _cache.sessions.filter(s => s.drill_type === dt);
+    if (!sid || !typed.find(s => s.id === sid)) {
+      if (typed.length > 0) {
+        sid = typed[0].id;
+      } else {
+        const now = new Date();
+        const row = await dbCreateSession(dt, now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
+        _cache.sessions.push(row);
+        sid = row.id;
+      }
+      setActiveSessionId(dt, sid);
+    }
+    // Load entries for ALL sessions of this type (needed for weighted mode history)
+    for (const s of typed) {
+      if (_cache.entries[s.id]) continue;
+      const entries = await dbGetEntries(s.id);
+      _cache.entries[s.id] = {};
+      for (const e of entries) {
+        _cache.entries[s.id][e.drill_key] = { attempts: e.attempts, type: e.shot_type || '', note: e.note || '' };
+      }
+    }
+  }
+}
+
+// ── Config ──────────────────────────────────────────
 
 function getPosLabel(ballNum, posKey) {
-  const cfg = loadConfig();
   const k = ballNum + ':' + posKey;
-  return (cfg.posLabels && cfg.posLabels[k]) || '';
+  return (_cache.config.posLabels && _cache.config.posLabels[k]) || '';
 }
 
 function setPosLabel(ballNum, posKey, label) {
-  const cfg = loadConfig();
-  if (!cfg.posLabels) cfg.posLabels = {};
+  if (!_cache.config.posLabels) _cache.config.posLabels = {};
   const k = ballNum + ':' + posKey;
-  if (label) cfg.posLabels[k] = label;
-  else delete cfg.posLabels[k];
-  saveConfig(cfg);
+  if (label) _cache.config.posLabels[k] = label;
+  else delete _cache.config.posLabels[k];
+  dbSaveConfig(_cache.config);
 }
 
 function isPosSkipped(ballNum, posKey) {
-  const cfg = loadConfig();
   const k = ballNum + ':' + posKey;
-  return !!(cfg.posSkipped && cfg.posSkipped[k]);
+  return !!(_cache.config.posSkipped && _cache.config.posSkipped[k]);
 }
 
 function setPosSkipped(ballNum, posKey, skipped) {
-  const cfg = loadConfig();
-  if (!cfg.posSkipped) cfg.posSkipped = {};
+  if (!_cache.config.posSkipped) _cache.config.posSkipped = {};
   const k = ballNum + ':' + posKey;
-  if (skipped) cfg.posSkipped[k] = true;
-  else delete cfg.posSkipped[k];
-  saveConfig(cfg);
+  if (skipped) _cache.config.posSkipped[k] = true;
+  else delete _cache.config.posSkipped[k];
+  dbSaveConfig(_cache.config);
 }
 
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore corrupt data */ }
-  return null;
-}
+// ── Positions Data ──────────────────────────────────
 
-function saveData(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function getAppData() {
-  let data = loadData();
-  if (!data || !data.sessions || data.sessions.length === 0) {
-    const session = createSession('positions');
-    data = { sessions: [session], activeSessionId: session.id };
-    saveData(data);
-  }
-  // Backfill drillType on legacy sessions
-  let dirty = false;
-  for (const s of data.sessions) {
-    if (!s.drillType) { s.drillType = 'positions'; dirty = true; }
-  }
-  if (!data.activeSessionId || !data.sessions.find((s) => s.id === data.activeSessionId)) {
-    data.activeSessionId = data.sessions[0].id;
-    dirty = true;
-  }
-  if (dirty) saveData(data);
-  return data;
-}
-
-/** Get the most recent session of the given drill type, or create one. */
-function getActiveSessionForType(drillType) {
-  const data = getAppData();
-  const current = data.sessions.find(s => s.id === data.activeSessionId);
-  if (current && current.drillType === drillType) return current;
-  // Find most recent session of this type
-  const sorted = [...data.sessions].filter(s => s.drillType === drillType)
-    .sort((a, b) => b.id.localeCompare(a.id));
-  if (sorted.length > 0) {
-    data.activeSessionId = sorted[0].id;
-    saveData(data);
-    return sorted[0];
-  }
-  // None exists — create one
-  const session = createSession(drillType);
-  data.sessions.push(session);
-  data.activeSessionId = session.id;
-  saveData(data);
-  return session;
-}
-
-function createSession(drillType) {
-  const now = new Date();
-  const dt = drillType || state.drillType || 'positions';
-  const typeLabel = DRILL_TYPES[dt] ? DRILL_TYPES[dt].label : dt;
-  return {
-    id: now.toISOString(),
-    label: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
-    drillType: dt,
-    data: {},
-  };
-}
-
-function getActiveSession() {
-  const data = getAppData();
-  return data.sessions.find((s) => s.id === data.activeSessionId);
+function getEntry(ballNum, posKey, direction) {
+  const key = posDrillKey(ballNum, posKey, direction);
+  return activeEntries()[key] || null;
 }
 
 function saveEntry(ballNum, posKey, attempts, type, direction) {
-  const data = getAppData();
-  const session = data.sessions.find((s) => s.id === data.activeSessionId);
-  const ballKey = 'ball' + ballNum;
-  if (!session.data[ballKey]) session.data[ballKey] = {};
-  const effectiveKey = direction ? posKey + ':' + direction : posKey;
-  const prev = session.data[ballKey][effectiveKey];
-  session.data[ballKey][effectiveKey] = { attempts, type, note: (prev && prev.note) || '' };
-  saveData(data);
+  const key = posDrillKey(ballNum, posKey, direction);
+  const sid = activeSessionId();
+  if (!_cache.entries[sid]) _cache.entries[sid] = {};
+  const prev = _cache.entries[sid][key];
+  _cache.entries[sid][key] = { attempts, type, note: (prev && prev.note) || '' };
+  dbSaveEntry(sid, key, attempts, type, (prev && prev.note) || '');
 }
 
 function saveNote(ballNum, posKey, note, direction) {
-  const data = getAppData();
-  const session = data.sessions.find((s) => s.id === data.activeSessionId);
-  const ballKey = 'ball' + ballNum;
-  if (!session.data[ballKey]) session.data[ballKey] = {};
-  const effectiveKey = direction ? posKey + ':' + direction : posKey;
-  if (!session.data[ballKey][effectiveKey]) {
-    session.data[ballKey][effectiveKey] = { attempts: 0, type: 'cut', note };
+  const key = posDrillKey(ballNum, posKey, direction);
+  const sid = activeSessionId();
+  if (!_cache.entries[sid]) _cache.entries[sid] = {};
+  const prev = _cache.entries[sid][key];
+  if (!prev) {
+    _cache.entries[sid][key] = { attempts: 0, type: 'cut', note };
   } else {
-    session.data[ballKey][effectiveKey].note = note;
+    _cache.entries[sid][key] = { ...prev, note };
   }
-  saveData(data);
-}
-
-function getEntry(ballNum, posKey, direction) {
-  const session = getActiveSession();
-  const ballKey = 'ball' + ballNum;
-  const effectiveKey = direction ? posKey + ':' + direction : posKey;
-  return session.data[ballKey] ? session.data[ballKey][effectiveKey] : null;
+  dbSaveEntry(sid, key, prev ? prev.attempts : 0, prev ? prev.type : 'cut', note);
 }
 
 function getBallTotal(ballNum) {
-  const session = getActiveSession();
-  const ballKey = 'ball' + ballNum;
-  const positions = session.data[ballKey];
-  if (!positions) return 0;
-  return Object.values(positions).reduce((sum, e) => sum + (e.attempts || 0), 0);
+  const entries = activeEntries();
+  const prefix = `pos-${ballNum}-`;
+  let total = 0;
+  for (const [k, e] of Object.entries(entries)) {
+    if (k.startsWith(prefix) && e.attempts) total += e.attempts;
+  }
+  return total;
 }
 
 function getBallFilledCount(ballNum) {
-  const session = getActiveSession();
-  const ballKey = 'ball' + ballNum;
-  const positions = session.data[ballKey];
-  if (!positions) return 0;
-  return Object.keys(positions).length;
+  const entries = activeEntries();
+  const prefix = `pos-${ballNum}-`;
+  let count = 0;
+  for (const k of Object.keys(entries)) {
+    if (k.startsWith(prefix) && entries[k].attempts >= 2) count++;
+  }
+  return count;
 }
 
 function getSessionTotal() {
-  const session = getActiveSession();
+  const entries = activeEntries();
   let total = 0;
-  for (const ballKey of Object.keys(session.data)) {
-    for (const entry of Object.values(session.data[ballKey])) {
-      total += entry.attempts || 0;
-    }
+  for (const e of Object.values(entries)) {
+    if (e.attempts) total += e.attempts;
   }
   return total;
 }
 
 function getSessionFilledCount() {
-  const session = getActiveSession();
+  const entries = activeEntries();
   let count = 0;
-  for (const ballKey of Object.keys(session.data)) {
-    count += Object.keys(session.data[ballKey]).length;
+  for (const e of Object.values(entries)) {
+    if (e.attempts >= 2) count++;
   }
   return count;
 }
@@ -592,24 +573,24 @@ function getCycleProgress() {
 // ── Mighty X Data Functions ─────────────────────────
 
 function getMxEntry(key) {
-  const session = getActiveSession();
-  return session.data[key] || null;
+  return activeEntries()[key] || null;
 }
 
 function saveMxEntry(key, attempts) {
-  const data = getAppData();
-  const session = data.sessions.find(s => s.id === data.activeSessionId);
-  const prev = session.data[key];
-  session.data[key] = { attempts, note: (prev && prev.note) || '' };
-  saveData(data);
+  const sid = activeSessionId();
+  if (!_cache.entries[sid]) _cache.entries[sid] = {};
+  const prev = _cache.entries[sid][key];
+  _cache.entries[sid][key] = { attempts, type: '', note: (prev && prev.note) || '' };
+  dbSaveEntry(sid, key, attempts, '', (prev && prev.note) || '');
 }
 
 function saveMxNote(key, note) {
-  const data = getAppData();
-  const session = data.sessions.find(s => s.id === data.activeSessionId);
-  if (!session.data[key]) session.data[key] = { attempts: 0, note };
-  else session.data[key].note = note;
-  saveData(data);
+  const sid = activeSessionId();
+  if (!_cache.entries[sid]) _cache.entries[sid] = {};
+  const prev = _cache.entries[sid][key];
+  if (!prev) _cache.entries[sid][key] = { attempts: 0, type: '', note };
+  else _cache.entries[sid][key] = { ...prev, note };
+  dbSaveEntry(sid, key, prev ? prev.attempts : 0, '', note);
 }
 
 function isMxEntryComplete(key) {
@@ -635,10 +616,10 @@ function getMxCycleProgress() {
 }
 
 function getMxSessionTotal() {
-  const session = getActiveSession();
+  const entries = activeEntries();
   let total = 0;
-  for (const key of Object.keys(session.data)) {
-    if (session.data[key] && session.data[key].attempts) total += session.data[key].attempts;
+  for (const [key, e] of Object.entries(entries)) {
+    if (key.match(/^(left|right)-\d+-/) && e.attempts) total += e.attempts;
   }
   return total;
 }
@@ -666,18 +647,17 @@ function mxResumeProgression() {
 
 function getWagonEntry(idx) {
   const pos = WW_POSITIONS[idx];
-  const session = getActiveSession();
-  return session.data[wwKey(pos)] || null;
+  return activeEntries()[wwKey(pos)] || null;
 }
 
 function saveWagonEntry(idx, attempts) {
   const pos = WW_POSITIONS[idx];
-  const data = getAppData();
-  const session = data.sessions.find(s => s.id === data.activeSessionId);
   const key = wwKey(pos);
-  const prev = session.data[key];
-  session.data[key] = { attempts, note: (prev && prev.note) || '' };
-  saveData(data);
+  const sid = activeSessionId();
+  if (!_cache.entries[sid]) _cache.entries[sid] = {};
+  const prev = _cache.entries[sid][key];
+  _cache.entries[sid][key] = { attempts, type: '', note: (prev && prev.note) || '' };
+  dbSaveEntry(sid, key, attempts, '', (prev && prev.note) || '');
 }
 
 function isWagonSpokeComplete(idx) {
@@ -701,10 +681,10 @@ function getWagonCycleProgress() {
 }
 
 function getWagonSessionTotal() {
-  const session = getActiveSession();
+  const entries = activeEntries();
   let total = 0;
   for (let i = 0; i < WW_TOTAL; i++) {
-    const entry = session.data[wwKey(WW_POSITIONS[i])];
+    const entry = entries[wwKey(WW_POSITIONS[i])];
     if (entry && entry.attempts) total += entry.attempts;
   }
   return total;
@@ -719,6 +699,61 @@ function wagonResumeProgression() {
   }
 }
 
+// ── Weighted Random Helpers ─────────────────────────
+
+/** Get rolling average for a drill key across all cached sessions. */
+function getLocalRollingAvg(drillKey, n) {
+  const allSessions = sessionsForType(state.drillType);
+  const results = [];
+  for (const s of allSessions) {
+    if (results.length >= n) break;
+    const entries = _cache.entries[s.id];
+    if (!entries) continue;
+    const e = entries[drillKey];
+    if (e && e.attempts >= 2) results.push(e.attempts);
+  }
+  if (results.length === 0) return null;
+  return results.reduce((a, b) => a + b, 0) / results.length;
+}
+
+/** Check if a drill key is mastered (last attempt === 2, within last N cycles). */
+function isMastered(drillKey) {
+  const allSessions = sessionsForType(state.drillType);
+  // Find the most recent session that has this key
+  for (let i = 0; i < allSessions.length; i++) {
+    const entries = _cache.entries[allSessions[i].id];
+    if (!entries) continue;
+    const e = entries[drillKey];
+    if (e && e.attempts >= 2) {
+      // Found the most recent attempt
+      if (e.attempts === 2 && i < MASTERED_CYCLE_SKIP) return true;
+      return false;
+    }
+  }
+  return false;
+}
+
+/** Compute weight for a drill key. */
+function getDrillWeight(drillKey) {
+  const avg = getLocalRollingAvg(drillKey, ROLLING_AVG_COUNT);
+  if (avg === null) return 100; // never attempted
+  if (isMastered(drillKey)) return 0; // mastered, skip
+  return avg; // rolling average as weight
+}
+
+/** Weighted random selection from array of {item, weight}. */
+function weightedPick(items) {
+  const eligible = items.filter(i => i.weight > 0);
+  if (eligible.length === 0) return null;
+  const totalWeight = eligible.reduce((s, i) => s + i.weight, 0);
+  let r = Math.random() * totalWeight;
+  for (const i of eligible) {
+    r -= i.weight;
+    if (r <= 0) return i.item;
+  }
+  return eligible[eligible.length - 1].item;
+}
+
 function wagonPickRandom() {
   const incomplete = [];
   for (let i = 0; i < WW_TOTAL; i++) {
@@ -726,6 +761,18 @@ function wagonPickRandom() {
   }
   if (incomplete.length === 0) return;
   state.wagonSpoke = incomplete[Math.floor(Math.random() * incomplete.length)];
+}
+
+function wagonPickWeighted() {
+  const items = [];
+  for (let i = 0; i < WW_TOTAL; i++) {
+    if (isWagonSpokeComplete(i)) continue; // already done this cycle
+    const key = wwKey(WW_POSITIONS[i]);
+    items.push({ item: i, weight: getDrillWeight(key) });
+  }
+  const pick = weightedPick(items);
+  if (pick !== null) state.wagonSpoke = pick;
+  else wagonPickRandom(); // fallback if all mastered
 }
 
 // ── MX Random Mode ──────────────────────────────────
@@ -744,6 +791,22 @@ function mxPickRandom() {
   state.mxSide = pick.side;
   state.mxLevel = pick.level;
   state.mxShot = pick.shot;
+}
+
+function mxPickWeighted() {
+  const items = [];
+  for (const side of MX_SIDES) {
+    for (const level of MX_LEVELS) {
+      for (const shot of MX_SHOTS) {
+        const key = mxKey(side, level, shot);
+        if (isMxEntryComplete(key)) continue;
+        items.push({ item: { side, level, shot }, weight: getDrillWeight(key) });
+      }
+    }
+  }
+  const pick = weightedPick(items);
+  if (pick) { state.mxSide = pick.side; state.mxLevel = pick.level; state.mxShot = pick.shot; }
+  else mxPickRandom();
 }
 
 // ── Positions Random Mode ───────────────────────────
@@ -765,6 +828,41 @@ function posPickRandom() {
   state.selectedPosition = pick.key;
   if (isDualPosition(pick.ball, pick.key)) {
     state.direction = !getEntry(pick.ball, pick.key, 'L') ? 'L' : 'R';
+  }
+}
+
+function posPickWeighted() {
+  const items = [];
+  for (let b = 1; b <= 12; b++) {
+    const positions = getCuePositions(b);
+    for (const p of positions) {
+      const key = coordKey(p);
+      if (isPositionComplete(b, key)) continue;
+      // For dual positions, weight by both sides combined
+      const isDual = isDualPosition(b, key);
+      if (isDual) {
+        const keyL = posDrillKey(b, key, 'L');
+        const keyR = posDrillKey(b, key, 'R');
+        const wL = getEntry(b, key, 'L') ? 0 : getDrillWeight(keyL);
+        const wR = getEntry(b, key, 'R') ? 0 : getDrillWeight(keyR);
+        const w = Math.max(wL, wR);
+        if (w > 0) items.push({ item: { ball: b, key }, weight: w });
+      } else {
+        const dk = posDrillKey(b, key, null);
+        const w = getDrillWeight(dk);
+        if (w > 0) items.push({ item: { ball: b, key }, weight: w });
+      }
+    }
+  }
+  const pick = weightedPick(items);
+  if (pick) {
+    state.selectedBall = pick.ball;
+    state.selectedPosition = pick.key;
+    if (isDualPosition(pick.ball, pick.key)) {
+      state.direction = !getEntry(pick.ball, pick.key, 'L') ? 'L' : 'R';
+    }
+  } else {
+    posPickRandom();
   }
 }
 
@@ -1097,18 +1195,15 @@ function renderTotals() {
 }
 
 function renderSessionSelector() {
-  const data = getAppData();
   const select = document.getElementById('session-select');
   select.innerHTML = '';
-  // Show only sessions of current drill type, newest first
-  const sorted = [...data.sessions]
-    .filter(s => (s.drillType || 'positions') === state.drillType)
-    .sort((a, b) => b.id.localeCompare(a.id));
+  const sorted = sessionsForType(state.drillType);
+  const sid = activeSessionId();
   for (const s of sorted) {
     const opt = document.createElement('option');
     opt.value = s.id;
     opt.textContent = s.label;
-    if (s.id === data.activeSessionId) opt.selected = true;
+    if (s.id === sid) opt.selected = true;
     select.appendChild(opt);
   }
 }
@@ -1130,7 +1225,6 @@ function renderDrillTypeTabs() {
 function switchDrillType(type) {
   if (type === state.drillType) return;
   state.drillType = type;
-  getActiveSessionForType(type);
   state.currentInput = '2';
   state.freshInput = true;
   if (type === 'positions') {
@@ -1189,13 +1283,13 @@ function hideCycleModal() {
   if (backdrop) backdrop.style.display = 'none';
 }
 
-function startNewCycle() {
+async function startNewCycle() {
   hideCycleModal();
-  const data = getAppData();
-  const session = createSession(state.drillType);
-  data.sessions.push(session);
-  data.activeSessionId = session.id;
-  saveData(data);
+  const now = new Date();
+  const row = await dbCreateSession(state.drillType, now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
+  _cache.sessions.push(row);
+  _cache.entries[row.id] = {};
+  setActiveSessionId(state.drillType, row.id);
   state.currentInput = '2';
   state.freshInput = true;
   if (state.drillType === 'positions') {
@@ -1313,8 +1407,10 @@ function pressSave() {
     }
   }
 
-  // Auto-advance: random or sequential
-  if (state.posRandom) {
+  // Auto-advance based on mode
+  if (state.posMode === 'weighted') {
+    posPickWeighted();
+  } else if (state.posMode === 'rand') {
     posPickRandom();
   } else {
     // Auto-advance to next unfilled position (from start of sequence)
@@ -1399,7 +1495,7 @@ function showPosPopover(ballNum, posKey) {
 
 // ── Session Management ──────────────────────────────
 
-function newSession() {
+async function newSession() {
   if (state.drillType === 'positions' && !isCycleComplete()) {
     const { done } = getCycleProgress();
     if (!confirm(`Current cycle has ${done}/12 drills complete. Start a new cycle anyway? (Current progress will be kept in history.)`)) return;
@@ -1410,11 +1506,11 @@ function newSession() {
     const { done, total } = getWagonCycleProgress();
     if (!confirm(`Current cycle has ${done}/${total} positions complete. Start a new cycle anyway?`)) return;
   }
-  const data = getAppData();
-  const session = createSession(state.drillType);
-  data.sessions.push(session);
-  data.activeSessionId = session.id;
-  saveData(data);
+  const now = new Date();
+  const row = await dbCreateSession(state.drillType, now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
+  _cache.sessions.push(row);
+  _cache.entries[row.id] = {};
+  setActiveSessionId(state.drillType, row.id);
   state.currentInput = '2';
   state.freshInput = true;
   if (state.drillType === 'positions') {
@@ -1431,28 +1527,42 @@ function newSession() {
   showToast('New cycle started');
 }
 
-function resetSession() {
+async function resetSession() {
   if (!confirm('Clear all data in the current session?')) return;
-  const data = getAppData();
-  const session = data.sessions.find((s) => s.id === data.activeSessionId);
-  session.data = {};
-  saveData(data);
+  const sid = activeSessionId();
+  // Delete all entries for this session remotely
+  if (_userId && _online) {
+    await sb.from('drill_entries').delete().eq('session_id', sid);
+  }
+  _cache.entries[sid] = {};
+  localStorage.removeItem(LS_ENTRIES_PREFIX + sid);
   state.currentInput = '2';
   state.freshInput = true;
   renderAll();
   showToast('Session cleared');
 }
 
-function deleteSession() {
-  const data = getAppData();
-  if (data.sessions.length <= 1) {
+async function deleteSession() {
+  const typed = sessionsForType(state.drillType);
+  if (typed.length <= 1) {
     showToast('Cannot delete only session');
     return;
   }
   if (!confirm('Delete this session permanently?')) return;
-  data.sessions = data.sessions.filter((s) => s.id !== data.activeSessionId);
-  data.activeSessionId = data.sessions[0].id;
-  saveData(data);
+  const sid = activeSessionId();
+  await dbDeleteSession(sid);
+  _cache.sessions = _cache.sessions.filter(s => s.id !== sid);
+  delete _cache.entries[sid];
+  const remaining = sessionsForType(state.drillType);
+  setActiveSessionId(state.drillType, remaining[0].id);
+  // Load entries for new active session
+  if (!_cache.entries[remaining[0].id]) {
+    const entries = await dbGetEntries(remaining[0].id);
+    _cache.entries[remaining[0].id] = {};
+    for (const e of entries) {
+      _cache.entries[remaining[0].id][e.drill_key] = { attempts: e.attempts, type: e.shot_type || '', note: e.note || '' };
+    }
+  }
   state.selectedBall = 1;
   state.selectedPosition = null;
   state.currentInput = '2';
@@ -1461,10 +1571,15 @@ function deleteSession() {
   showToast('Session deleted');
 }
 
-function switchSession(id) {
-  const data = getAppData();
-  data.activeSessionId = id;
-  saveData(data);
+async function switchSession(id) {
+  setActiveSessionId(state.drillType, id);
+  if (!_cache.entries[id]) {
+    const entries = await dbGetEntries(id);
+    _cache.entries[id] = {};
+    for (const e of entries) {
+      _cache.entries[id][e.drill_key] = { attempts: e.attempts, type: e.shot_type || '', note: e.note || '' };
+    }
+  }
   state.currentInput = '2';
   state.freshInput = true;
   if (state.drillType === 'positions') {
@@ -1479,10 +1594,31 @@ function switchSession(id) {
   renderAll();
 }
 
-function resetAll() {
+async function resetAll() {
   if (!confirm('Delete ALL sessions and stats? This cannot be undone.')) return;
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(CONFIG_KEY);
+  // Delete all remote data
+  if (_userId && _online) {
+    await sb.from('drill_entries').delete().eq('user_id', _userId);
+    await sb.from('sessions').delete().eq('user_id', _userId);
+    await sb.from('user_config').delete().eq('user_id', _userId);
+  }
+  // Clear local cache
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('pdt_')) localStorage.removeItem(key);
+  }
+  localStorage.removeItem('poolDrillData');
+  localStorage.removeItem('poolDrillConfig');
+  _cache.sessions = [];
+  _cache.entries = {};
+  _cache.config = { posLabels: {}, posSkipped: {} };
+  // Re-create default sessions
+  for (const dt of ['positions', 'mightyx', 'wagon']) {
+    const now = new Date();
+    const row = await dbCreateSession(dt, now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
+    _cache.sessions.push(row);
+    _cache.entries[row.id] = {};
+    setActiveSessionId(dt, row.id);
+  }
   state.selectedBall = 1;
   state.selectedPosition = null;
   state.currentInput = '2';
@@ -1492,8 +1628,8 @@ function resetAll() {
 }
 
 function exportData() {
-  const data = getAppData();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const exportObj = { sessions: _cache.sessions, entries: _cache.entries, config: _cache.config };
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -1637,10 +1773,11 @@ function renderMightyX() {
   }
   html += `</div></div>`;
 
-  // Mode toggle (Sequential / Random)
+  // Mode toggle (Sequential / Random / Weighted)
   html += `<div class="drill-selector"><div class="drill-toggle">`;
-  html += `<button class="drill-toggle-btn ${!state.mxRandom ? 'active' : ''}" data-mx-mode="seq">Sequential</button>`;
-  html += `<button class="drill-toggle-btn ${state.mxRandom ? 'active' : ''}" data-mx-mode="rand">🎲 Random</button>`;
+  html += `<button class="drill-toggle-btn ${state.mxMode === 'seq' ? 'active' : ''}" data-mx-mode="seq">Sequential</button>`;
+  html += `<button class="drill-toggle-btn ${state.mxMode === 'rand' ? 'active' : ''}" data-mx-mode="rand">🎲 Random</button>`;
+  html += `<button class="drill-toggle-btn ${state.mxMode === 'weighted' ? 'active' : ''}" data-mx-mode="weighted">⚖️ Weighted</button>`;
   html += `</div></div>`;
 
   // Input row
@@ -1796,10 +1933,11 @@ function renderWagonWheel() {
   }
   html += `</div></div>`;
 
-  // Mode toggle (Sequential / Random)
+  // Mode toggle (Sequential / Random / Weighted)
   html += `<div class="drill-selector"><div class="drill-toggle">`;
-  html += `<button class="drill-toggle-btn ${!state.wagonRandom ? 'active' : ''}" data-wagon-mode="seq">Sequential</button>`;
-  html += `<button class="drill-toggle-btn ${state.wagonRandom ? 'active' : ''}" data-wagon-mode="rand">🎲 Random</button>`;
+  html += `<button class="drill-toggle-btn ${state.wagonMode === 'seq' ? 'active' : ''}" data-wagon-mode="seq">Sequential</button>`;
+  html += `<button class="drill-toggle-btn ${state.wagonMode === 'rand' ? 'active' : ''}" data-wagon-mode="rand">🎲 Random</button>`;
+  html += `<button class="drill-toggle-btn ${state.wagonMode === 'weighted' ? 'active' : ''}" data-wagon-mode="weighted">⚖️ Weighted</button>`;
   html += `</div></div>`;
 
   // Input row
@@ -1877,7 +2015,7 @@ function attachDrillHandlers(type) {
     });
     container.querySelectorAll('[data-mx-mode]').forEach(btn => {
       btn.addEventListener('click', () => {
-        state.mxRandom = btn.dataset.mxMode === 'rand';
+        state.mxMode = btn.dataset.mxMode;
         renderAll();
       });
     });
@@ -1895,7 +2033,7 @@ function attachDrillHandlers(type) {
     });
     container.querySelectorAll('[data-wagon-mode]').forEach(btn => {
       btn.addEventListener('click', () => {
-        state.wagonRandom = btn.dataset.wagonMode === 'rand';
+        state.wagonMode = btn.dataset.wagonMode;
         renderAll();
       });
     });
@@ -1939,7 +2077,8 @@ function pressSaveMx() {
   if (display) { display.classList.add('flash'); setTimeout(() => display.classList.remove('flash'), 400); }
 
   // Auto-advance to next incomplete
-  if (state.mxRandom) mxPickRandom();
+  if (state.mxMode === 'weighted') mxPickWeighted();
+  else if (state.mxMode === 'rand') mxPickRandom();
   else mxResumeProgression();
   state.currentInput = '2';
   state.freshInput = true;
@@ -1960,7 +2099,8 @@ function pressSaveWagon() {
   if (display) { display.classList.add('flash'); setTimeout(() => display.classList.remove('flash'), 400); }
 
   // Auto-advance
-  if (state.wagonRandom) wagonPickRandom();
+  if (state.wagonMode === 'weighted') wagonPickWeighted();
+  else if (state.wagonMode === 'rand') wagonPickRandom();
   else wagonResumeProgression();
   state.currentInput = '2';
   state.freshInput = true;
@@ -2014,20 +2154,17 @@ function init() {
   document.getElementById('btn-backspace').addEventListener('click', pressBackspace);
   document.getElementById('btn-save').addEventListener('click', pressSave);
 
-  // Positions random mode toggle
+  // Positions mode toggle (seq / rand / weighted)
   function updatePosModeBtns() {
-    const seqBtn = document.getElementById('btn-pos-seq');
-    const randBtn = document.getElementById('btn-pos-rand');
-    if (seqBtn) seqBtn.classList.toggle('active', !state.posRandom);
-    if (randBtn) randBtn.classList.toggle('active', state.posRandom);
+    document.querySelectorAll('.pos-mode-toggle .drill-toggle-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.posMode === state.posMode);
+    });
   }
-  document.getElementById('btn-pos-seq').addEventListener('click', () => {
-    state.posRandom = false;
-    updatePosModeBtns();
-  });
-  document.getElementById('btn-pos-rand').addEventListener('click', () => {
-    state.posRandom = true;
-    updatePosModeBtns();
+  document.querySelectorAll('[data-pos-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.posMode = btn.dataset.posMode;
+      updatePosModeBtns();
+    });
   });
 
   // Direction toggle (L/R for dual positions)
@@ -2071,6 +2208,7 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadPositionConfigs();
+  await loadAppData();
   if (document.getElementById('btn-save')) init();
 
   // Swipe navigation between drill tabs

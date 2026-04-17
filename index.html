@@ -90,11 +90,12 @@
     </div>
   </div>
 
-  <!-- Mode Toggle (Sequential / Random) -->
-  <div class="drill-selector pos-mode-toggle">
+  <!-- Mode Toggle (Sequential / Random / Weighted) -->
+  <div class="pos-mode-toggle">
     <div class="drill-toggle">
-      <button class="drill-toggle-btn active" id="btn-pos-seq">Sequential</button>
-      <button class="drill-toggle-btn" id="btn-pos-rand">🎲 Random</button>
+      <button class="drill-toggle-btn" data-pos-mode="seq">Sequential</button>
+      <button class="drill-toggle-btn" data-pos-mode="rand">🎲 Random</button>
+      <button class="drill-toggle-btn active" data-pos-mode="weighted">⚖️ Weighted</button>
     </div>
   </div>
 
@@ -148,6 +149,8 @@
 
 
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

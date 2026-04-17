@@ -1,10 +1,11 @@
-const CACHE_NAME = 'pool-drill-v50';
+const CACHE_NAME = 'pool-drill-v52';
 const ASSETS = [
   './',
   './index.html',
   './stats.html',
   './styles.css',
   './stats.css',
+  './supabase.js',
   './app.js',
   './stats.js',
   './manifest.json',

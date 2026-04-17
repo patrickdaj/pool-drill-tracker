@@ -835,7 +835,8 @@ body {
 
 /* Positions mode toggle */
 .pos-mode-toggle {
-  max-width: 440px;
+  max-width: 260px;
+  margin: 0 auto;
   padding: 4px 0;
 }
 

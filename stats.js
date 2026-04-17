@@ -72,17 +72,37 @@ function mergeSessionsData(sessions) {
   return merged;
 }
 
-/** Get sessions for the current view. */
+/** Convert flat entries to nested session.data format for stats computation. */
+function toNestedData(entries) {
+  const data = {};
+  for (const [key, entry] of Object.entries(entries)) {
+    if (key.startsWith('pos-')) {
+      const m = key.match(/^pos-(\d+)-(.+)$/);
+      if (m) {
+        const ballKey = 'ball' + m[1];
+        if (!data[ballKey]) data[ballKey] = {};
+        data[ballKey][m[2]] = entry;
+      }
+    } else {
+      data[key] = entry;
+    }
+  }
+  return data;
+}
+
+/** Get sessions for the current view with legacy .data format. */
 function getViewSessions() {
-  const data = getAppData();
-  const typed = data.sessions.filter(s => (s.drillType || 'positions') === statsDrillType);
-  const sorted = [...typed].sort((a, b) => b.id.localeCompare(a.id));
-  if (statsView === 'trending') return sorted.slice(0, TRENDING_COUNT);
-  if (statsView === 'history') return sorted;
-  // Session view — use active if it matches, otherwise most recent of type
-  const active = data.sessions.find(s => s.id === data.activeSessionId);
-  if (active && (active.drillType || 'positions') === statsDrillType) return [active];
-  return sorted.length > 0 ? [sorted[0]] : [{ data: {} }];
+  const typed = _cache.sessions.filter(s => s.drill_type === statsDrillType);
+  const sorted = [...typed].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  let result;
+  if (statsView === 'trending') result = sorted.slice(0, TRENDING_COUNT);
+  else if (statsView === 'history') result = sorted;
+  else {
+    const sid = getActiveSessionId(statsDrillType);
+    const active = _cache.sessions.find(s => s.id === sid);
+    result = active ? [active] : sorted.length > 0 ? [sorted[0]] : [];
+  }
+  return result.map(s => ({ ...s, id: s.id, data: toNestedData(_cache.entries[s.id] || {}) }));
 }
 
 /** Get the effective data object for the current view. */
@@ -391,12 +411,14 @@ function renderPositionsStats() {
   });
 
   // Trends vs previous session (only in session view)
-  const data = getAppData();
-  const sorted = [...data.sessions].sort((a, b) => b.id.localeCompare(a.id));
-  const session = getActiveSession();
-  const currentIdx = sorted.findIndex((ses) => ses.id === session.id);
-  if (statsView === 'session' && currentIdx >= 0 && currentIdx < sorted.length - 1) {
-    const prev = sorted[currentIdx + 1];
+  const allSorted = _cache.sessions
+    .filter(s => s.drill_type === 'positions')
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const activeSid = getActiveSessionId('positions');
+  const currentIdx = allSorted.findIndex(s => s.id === activeSid);
+  if (statsView === 'session' && currentIdx >= 0 && currentIdx < allSorted.length - 1) {
+    const prevSession = allSorted[currentIdx + 1];
+    const prev = { data: toNestedData(_cache.entries[prevSession.id] || {}) };
     const ps = computeStats(prev);
     trendsSection.style.display = '';
     const ttg = document.getElementById('stats-trends-grid');
@@ -601,16 +623,16 @@ function renderWagonStats() {
 function renderSessionSelector() {
   const select = document.getElementById('session-select');
   if (!select) return;
-  const data = getAppData();
+  const sorted = _cache.sessions
+    .filter(s => s.drill_type === statsDrillType)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
   select.innerHTML = '';
-  const sorted = [...data.sessions]
-    .filter(s => (s.drillType || 'positions') === statsDrillType)
-    .sort((a, b) => b.id.localeCompare(a.id));
+  const sid = getActiveSessionId(statsDrillType);
   for (const s of sorted) {
     const opt = document.createElement('option');
     opt.value = s.id;
     opt.textContent = s.label;
-    if (s.id === data.activeSessionId) opt.selected = true;
+    if (s.id === sid) opt.selected = true;
     select.appendChild(opt);
   }
 }
@@ -634,14 +656,12 @@ function renderStatsDrillTabs() {
 }
 
 function switchSession(id) {
-  const data = getAppData();
-  data.activeSessionId = id;
-  saveData(data);
+  setActiveSessionId(statsDrillType, id);
   renderStats();
   renderSessionSelector();
 }
 
-function initStats() {
+async function initStats() {
   renderStatsDrillTabs();
   renderSessionSelector();
   renderStats();
@@ -662,5 +682,6 @@ function initStats() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadPositionConfigs();
-  initStats();
+  await loadAppData();
+  await initStats();
 });
