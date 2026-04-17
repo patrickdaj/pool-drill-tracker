@@ -7,6 +7,19 @@ const TRENDING_COUNT = 5;
 
 let statsView = 'session'; // 'session' | 'trending' | 'history'
 let statsDrillType = 'positions'; // current drill type filter
+let statsWagonVariant = 'center'; // 'center' | 'endRail' | 'sideRail'
+let statsWagonSide = 'left';      // 'left' | 'right'
+
+function statsWagonDrillType() {
+  if (statsWagonVariant === 'center') return 'wagon';
+  const v = statsWagonVariant === 'endRail' ? 'e' : 's';
+  return `wagon-${v}${statsWagonSide[0]}`;
+}
+
+function statsEffectiveDrillType() {
+  if (statsDrillType === 'wagon') return statsWagonDrillType();
+  return statsDrillType;
+}
 
 function cbDistance(ballNum, posKey) {
   const bp = BALL_POSITIONS[ballNum];
@@ -92,13 +105,14 @@ function toNestedData(entries) {
 
 /** Get sessions for the current view with legacy .data format. */
 function getViewSessions() {
-  const typed = _cache.sessions.filter(s => s.drill_type === statsDrillType);
+  const dt = statsEffectiveDrillType();
+  const typed = _cache.sessions.filter(s => s.drill_type === dt);
   const sorted = [...typed].sort((a, b) => b.created_at.localeCompare(a.created_at));
   let result;
   if (statsView === 'trending') result = sorted.slice(0, TRENDING_COUNT);
   else if (statsView === 'history') result = sorted;
   else {
-    const sid = getActiveSessionId(statsDrillType);
+    const sid = getActiveSessionId(dt);
     const active = _cache.sessions.find(s => s.id === sid);
     result = active ? [active] : sorted.length > 0 ? [sorted[0]] : [];
   }
@@ -279,6 +293,9 @@ function renderMiniTable(ballNum, ballStats) {
 }
 
 function renderStats() {
+  // Hide wagon variant selector by default
+  const wvc = document.getElementById('stats-wagon-variant');
+  if (wvc) wvc.style.display = 'none';
   if (statsDrillType === 'mightyx') return renderMxStats();
   if (statsDrillType === 'wagon') return renderWagonStats();
   renderPositionsStats();
@@ -538,17 +555,32 @@ function renderMxStats() {
 
 // ── Wagon Wheel Stats ───────────────────────────────
 
+function getStatsWWPositions() {
+  if (statsWagonVariant === 'center') return WW_ALL_DIAMONDS;
+  const cfg = WW_CONFIGS[statsWagonVariant === 'center' ? 'center' : `${statsWagonVariant}-${statsWagonSide}`];
+  return ALL_24_DIAMONDS.filter(p => !cfg.exclude.has(`${p.col},${p.row}`));
+}
+
+function getStatsWWKeyPrefix() {
+  const cfg = WW_CONFIGS[statsWagonVariant === 'center' ? 'center' : `${statsWagonVariant}-${statsWagonSide}`];
+  return cfg.keyPrefix;
+}
+
+function statsWWKey(pos) {
+  return `${getStatsWWKeyPrefix()}-${pos.col}-${pos.row}`;
+}
+
 function computeWagonStats(sessions) {
-  // Aggregate across all 24 diamond positions
+  const positions = getStatsWWPositions();
   const byPos = {};
-  for (const pos of WW_ALL_DIAMONDS) {
-    byPos[wwKey(pos)] = { sum: 0, count: 0, pos };
+  for (const pos of positions) {
+    byPos[statsWWKey(pos)] = { sum: 0, count: 0, pos };
   }
   let totalAttempts = 0, totalSlots = 0;
 
   for (const session of sessions) {
-    for (const pos of WW_ALL_DIAMONDS) {
-      const key = wwKey(pos);
+    for (const pos of positions) {
+      const key = statsWWKey(pos);
       const entry = session.data[key];
       if (entry && entry.attempts >= 2) {
         byPos[key].sum += entry.attempts;
@@ -565,6 +597,7 @@ function computeWagonStats(sessions) {
 
 function renderWagonStats() {
   const sessions = getViewSessions();
+  const positions = getStatsWWPositions();
   const s = computeWagonStats(sessions);
 
   const sessionSelect = document.getElementById('session-select');
@@ -572,6 +605,38 @@ function renderWagonStats() {
 
   const overviewTitle = document.getElementById('stats-overview-title');
   overviewTitle.textContent = statsView === 'session' ? 'Session Overview' : statsView === 'trending' ? `Trending — Last ${sessions.length}` : `History — ${sessions.length} Sessions`;
+
+  // Variant selector
+  const variantContainer = document.getElementById('stats-wagon-variant');
+  if (variantContainer) {
+    let vh = `<div class="drill-toggle ww-variant-toggle">`;
+    vh += `<button class="drill-toggle-btn ${statsWagonVariant === 'center' ? 'active' : ''}" data-sww-variant="center">Center</button>`;
+    vh += `<button class="drill-toggle-btn ${statsWagonVariant === 'endRail' ? 'active' : ''}" data-sww-variant="endRail">End Rail</button>`;
+    vh += `<button class="drill-toggle-btn ${statsWagonVariant === 'sideRail' ? 'active' : ''}" data-sww-variant="sideRail">Side Rail</button>`;
+    vh += `</div>`;
+    if (statsWagonVariant !== 'center') {
+      vh += `<div class="drill-toggle ww-side-toggle" style="margin-top:4px">`;
+      vh += `<button class="drill-toggle-btn ${statsWagonSide === 'left' ? 'active' : ''}" data-sww-side="left">← Left</button>`;
+      vh += `<button class="drill-toggle-btn ${statsWagonSide === 'right' ? 'active' : ''}" data-sww-side="right">Right →</button>`;
+      vh += `</div>`;
+    }
+    variantContainer.innerHTML = vh;
+    variantContainer.style.display = '';
+    variantContainer.querySelectorAll('[data-sww-variant]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        statsWagonVariant = btn.dataset.swwVariant;
+        renderSessionSelector();
+        renderWagonStats();
+      });
+    });
+    variantContainer.querySelectorAll('[data-sww-side]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        statsWagonSide = btn.dataset.swwSide;
+        renderSessionSelector();
+        renderWagonStats();
+      });
+    });
+  }
 
   const sg = document.getElementById('stats-session-grid');
   const isMulti = statsView !== 'session';
@@ -588,7 +653,7 @@ function renderWagonStats() {
   sg.innerHTML = `
     <div class="stats-item"><div class="stats-item-value">${s.sessionPct.toFixed(0)}%</div><div class="stats-item-label">Hit Rate</div></div>
     <div class="stats-item"><div class="stats-item-value">${s.sessionAvg.toFixed(1)}</div><div class="stats-item-label">Avg Attempts</div></div>
-    <div class="stats-item"><div class="stats-item-value">${filledCount}/${WW_ALL_DIAMONDS.length}</div><div class="stats-item-label">${isMulti ? 'Positions Seen' : 'Filled'}</div></div>
+    <div class="stats-item"><div class="stats-item-value">${filledCount}/${positions.length}</div><div class="stats-item-label">${isMulti ? 'Positions Seen' : 'Filled'}</div></div>
     <div class="stats-item"><div class="stats-item-value">${best ? wwStatLabel(best.pos) : '-'}</div><div class="stats-item-label">Best (${best ? best.avg.toFixed(1) : '-'})</div></div>
     <div class="stats-item"><div class="stats-item-value">${worst ? wwStatLabel(worst.pos) : '-'}</div><div class="stats-item-label">Worst (${worst ? worst.avg.toFixed(1) : '-'})</div></div>
     <div class="stats-item"><div class="stats-item-value">${isMulti ? sessions.length : s.totalAttempts}</div><div class="stats-item-label">${isMulti ? 'Sessions' : 'Total Attempts'}</div></div>
@@ -597,8 +662,8 @@ function renderWagonStats() {
   // Per-position breakdown → use type grid
   const tg = document.getElementById('stats-type-grid');
   let spokeHtml = '';
-  for (const pos of WW_ALL_DIAMONDS) {
-    const d = s.byPos[wwKey(pos)];
+  for (const pos of positions) {
+    const d = s.byPos[statsWWKey(pos)];
     const avg = d.count > 0 ? d.sum / d.count : 0;
     const pct = avg > 0 ? hitPct(avg) : 0;
     spokeHtml += `<div class="stats-item"><div class="stats-item-value">${d.count > 0 ? pct.toFixed(0) + '%' : '-'}</div><div class="stats-item-label">${wwStatLabel(pos)} (${d.count})</div></div>`;
@@ -623,11 +688,12 @@ function renderWagonStats() {
 function renderSessionSelector() {
   const select = document.getElementById('session-select');
   if (!select) return;
+  const dt = statsEffectiveDrillType();
   const sorted = _cache.sessions
-    .filter(s => s.drill_type === statsDrillType)
+    .filter(s => s.drill_type === dt)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   select.innerHTML = '';
-  const sid = getActiveSessionId(statsDrillType);
+  const sid = getActiveSessionId(dt);
   for (const s of sorted) {
     const opt = document.createElement('option');
     opt.value = s.id;
@@ -656,7 +722,7 @@ function renderStatsDrillTabs() {
 }
 
 function switchSession(id) {
-  setActiveSessionId(statsDrillType, id);
+  setActiveSessionId(statsEffectiveDrillType(), id);
   renderStats();
   renderSessionSelector();
 }

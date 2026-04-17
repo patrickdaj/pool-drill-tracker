@@ -847,6 +847,20 @@ body {
   gap: 4px;
 }
 
+/* WW variant toggle */
+.ww-variant-toggle,
+.ww-side-toggle {
+  gap: 4px;
+}
+
+/* Stats wagon variant selector */
+.stats-wagon-variant {
+  width: 100%;
+  max-width: 440px;
+  padding: 4px 16px;
+  margin: 0 auto;
+}
+
 .wagon-spoke-btn {
   height: 26px;
   border-radius: 6px;

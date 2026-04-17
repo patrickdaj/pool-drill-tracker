@@ -332,20 +332,96 @@ const WW_TOTAL = WW_POSITIONS.length; // 23
 
 function wwKey(pos) { return `ww-${pos.col}-${pos.row}`; }
 
-// Shot setup: OB always at center one diamond from TS pocket (4,3)
-// OB always pockets into TS (top side) pocket. Only CB position changes.
+// All 24 diamond positions clockwise from TL (used by variant filtering)
+const ALL_24_DIAMONDS = [
+  { col: 0, row: 4 }, { col: 1, row: 4 }, { col: 2, row: 4 }, { col: 3, row: 4 },
+  { col: 4, row: 4 }, { col: 5, row: 4 }, { col: 6, row: 4 }, { col: 7, row: 4 },
+  { col: 8, row: 4 },                                            // top rail
+  { col: 8, row: 3 }, { col: 8, row: 2 }, { col: 8, row: 1 },  // right rail
+  { col: 8, row: 0 }, { col: 7, row: 0 }, { col: 6, row: 0 }, { col: 5, row: 0 },
+  { col: 4, row: 0 }, { col: 3, row: 0 }, { col: 2, row: 0 }, { col: 1, row: 0 },
+  { col: 0, row: 0 },                                            // bottom rail
+  { col: 0, row: 1 }, { col: 0, row: 2 }, { col: 0, row: 3 },  // left rail
+];
+
+// Wagon Wheel variant configurations
+// End rail = short rail (col 0 / col 8), OB 1 diamond from corner
+// Side rail = long rail (row 4 / row 0), OB 2 diamonds from corner
+const WW_CONFIGS = {
+  center: {
+    label: 'Center', exclude: new Set(['4,4']),
+    keyPrefix: 'ww', drillType: 'wagon',
+    ob: { col: 4, row: 3 }, pocket: { col: 4, row: 4 }, pocketLabel: 'Top Side',
+  },
+  'endRail-left': {
+    label: 'End Rail L', exclude: new Set(['0,4', '0,3', '0,2']),
+    keyPrefix: 'wwel', drillType: 'wagon-el',
+    ob: { col: 0, row: 3 }, pocket: { col: 0, row: 4 }, pocketLabel: 'Top Left',
+  },
+  'endRail-right': {
+    label: 'End Rail R', exclude: new Set(['8,4', '8,3', '8,2']),
+    keyPrefix: 'wwer', drillType: 'wagon-er',
+    ob: { col: 8, row: 3 }, pocket: { col: 8, row: 4 }, pocketLabel: 'Top Right',
+  },
+  'sideRail-left': {
+    label: 'Side Rail L', exclude: new Set(['0,4', '1,4', '2,4', '3,4']),
+    keyPrefix: 'wwsl', drillType: 'wagon-sl',
+    ob: { col: 2, row: 4 }, pocket: { col: 0, row: 4 }, pocketLabel: 'Top Left',
+  },
+  'sideRail-right': {
+    label: 'Side Rail R', exclude: new Set(['8,4', '7,4', '6,4', '5,4']),
+    keyPrefix: 'wwsr', drillType: 'wagon-sr',
+    ob: { col: 6, row: 4 }, pocket: { col: 8, row: 4 }, pocketLabel: 'Top Right',
+  },
+};
+
+const _wwPosCache = {};
+function getWWConfigKey() {
+  if (state.wagonVariant === 'center') return 'center';
+  return `${state.wagonVariant}-${state.wagonSide}`;
+}
+function getWWConfig() { return WW_CONFIGS[getWWConfigKey()]; }
+
+function getActiveWWPositions() {
+  const key = getWWConfigKey();
+  if (key === 'center') return WW_POSITIONS; // exact backward compat
+  if (!_wwPosCache[key]) {
+    const cfg = WW_CONFIGS[key];
+    _wwPosCache[key] = ALL_24_DIAMONDS.filter(p => !cfg.exclude.has(`${p.col},${p.row}`));
+  }
+  return _wwPosCache[key];
+}
+
+function getActiveWWTotal() { return getActiveWWPositions().length; }
+function activeWWKey(pos) { return `${getWWConfig().keyPrefix}-${pos.col}-${pos.row}`; }
+
+// Compound drill type for session tracking (includes variant info)
+function activeDrillType() {
+  if (state.drillType !== 'wagon' || state.wagonVariant === 'center') return state.drillType;
+  const v = state.wagonVariant === 'endRail' ? 'e' : 's';
+  return `wagon-${v}${state.wagonSide[0]}`;
+}
+
+// Shot setup based on active variant
 function wwShotSetup(posIdx) {
-  const isRight = posIdx <= 11;
-  // Target is always TS pocket
-  const target = { col: 4, row: 4 };
-  // OB: center table, one diamond from TS pocket
-  const ob = { col: 4, row: 3 };
-  // CB: near center; pos 12 (BS pocket) → directly between OB and BS pocket
+  const cfg = getWWConfig();
+  const positions = getActiveWWPositions();
+  const pos = positions[posIdx];
+  const target = cfg.pocket;
+  const ob = cfg.ob;
   let cb;
-  if (posIdx === 11) {
-    cb = { col: 4, row: 1.5 };
+  if (state.wagonVariant === 'center') {
+    if (pos.col === 4 && pos.row === 0) {
+      cb = { col: 4, row: 1.5 };
+    } else {
+      cb = { col: pos.col > 4 ? 3.5 : 4.5, row: 2 };
+    }
+  } else if (state.wagonVariant === 'endRail') {
+    // OB on short rail (end rail), 1 diamond from corner
+    cb = state.wagonSide === 'left' ? { col: 1.5, row: 1.5 } : { col: 6.5, row: 1.5 };
   } else {
-    cb = { col: isRight ? 3.5 : 4.5, row: 2 };
+    // OB on long rail (side rail), 2 diamonds from corner
+    cb = state.wagonSide === 'left' ? { col: 2.5, row: 2.5 } : { col: 5.5, row: 2.5 };
   }
   return { target, ob, cb };
 }
@@ -367,8 +443,10 @@ const state = {
   mxShot: 'follow',
   mxMode: 'weighted',         // 'seq' | 'rand' | 'weighted'
   // Wagon Wheel state
-  wagonSpoke: 0,             // index into WW_POSITIONS
+  wagonSpoke: 0,             // index into active WW positions
   wagonMode: 'weighted',      // 'seq' | 'rand' | 'weighted'
+  wagonVariant: 'center',    // 'center' | 'endRail' | 'sideRail'
+  wagonSide: 'left',         // 'left' | 'right' (for endRail/sideRail)
 };
 
 // ── Persistence (Supabase + in-memory cache) ───────
@@ -383,7 +461,7 @@ const _cache = {
 };
 
 function activeSessionId() {
-  return getActiveSessionId(state.drillType);
+  return getActiveSessionId(activeDrillType());
 }
 
 function activeSession() {
@@ -409,6 +487,9 @@ function posDrillKey(ballNum, posKey, direction) {
 
 // Load all data into _cache on startup
 let _appDataLoaded = false;
+// All session drill_types including wagon variants
+const ALL_SESSION_TYPES = ['positions', 'mightyx', 'wagon', 'wagon-el', 'wagon-er', 'wagon-sl', 'wagon-sr'];
+
 async function loadAppData() {
   if (_appDataLoaded) return;
   _appDataLoaded = true;
@@ -416,17 +497,20 @@ async function loadAppData() {
   _cache.config = await dbGetConfig();
   _cache.sessions = await dbGetAllSessions();
 
-  for (const dt of ['positions', 'mightyx', 'wagon']) {
+  for (const dt of ALL_SESSION_TYPES) {
     let sid = getActiveSessionId(dt);
     const typed = _cache.sessions.filter(s => s.drill_type === dt);
     if (!sid || !typed.find(s => s.id === sid)) {
       if (typed.length > 0) {
         sid = typed[0].id;
-      } else {
+      } else if (['positions', 'mightyx', 'wagon'].includes(dt)) {
+        // Only auto-create sessions for base types; variants are created on demand
         const now = new Date();
         const row = await dbCreateSession(dt, now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
         _cache.sessions.push(row);
         sid = row.id;
+      } else {
+        continue; // Skip variant types with no sessions yet
       }
       setActiveSessionId(dt, sid);
     }
@@ -646,13 +730,13 @@ function mxResumeProgression() {
 // ── Wagon Wheel Data Functions ──────────────────────
 
 function getWagonEntry(idx) {
-  const pos = WW_POSITIONS[idx];
-  return activeEntries()[wwKey(pos)] || null;
+  const pos = getActiveWWPositions()[idx];
+  return activeEntries()[activeWWKey(pos)] || null;
 }
 
 function saveWagonEntry(idx, attempts) {
-  const pos = WW_POSITIONS[idx];
-  const key = wwKey(pos);
+  const pos = getActiveWWPositions()[idx];
+  const key = activeWWKey(pos);
   const sid = activeSessionId();
   if (!_cache.entries[sid]) _cache.entries[sid] = {};
   const prev = _cache.entries[sid][key];
@@ -666,32 +750,36 @@ function isWagonSpokeComplete(idx) {
 }
 
 function isWagonCycleComplete() {
-  for (let i = 0; i < WW_TOTAL; i++) {
+  const total = getActiveWWTotal();
+  for (let i = 0; i < total; i++) {
     if (!isWagonSpokeComplete(i)) return false;
   }
   return true;
 }
 
 function getWagonCycleProgress() {
+  const total = getActiveWWTotal();
   let done = 0;
-  for (let i = 0; i < WW_TOTAL; i++) {
+  for (let i = 0; i < total; i++) {
     if (isWagonSpokeComplete(i)) done++;
   }
-  return { done, total: WW_TOTAL };
+  return { done, total };
 }
 
 function getWagonSessionTotal() {
   const entries = activeEntries();
+  const positions = getActiveWWPositions();
   let total = 0;
-  for (let i = 0; i < WW_TOTAL; i++) {
-    const entry = entries[wwKey(WW_POSITIONS[i])];
+  for (let i = 0; i < positions.length; i++) {
+    const entry = entries[activeWWKey(positions[i])];
     if (entry && entry.attempts) total += entry.attempts;
   }
   return total;
 }
 
 function wagonResumeProgression() {
-  for (let i = 0; i < WW_TOTAL; i++) {
+  const total = getActiveWWTotal();
+  for (let i = 0; i < total; i++) {
     if (!isWagonSpokeComplete(i)) {
       state.wagonSpoke = i;
       return;
@@ -703,7 +791,7 @@ function wagonResumeProgression() {
 
 /** Get rolling average for a drill key across all cached sessions. */
 function getLocalRollingAvg(drillKey, n) {
-  const allSessions = sessionsForType(state.drillType);
+  const allSessions = sessionsForType(activeDrillType());
   const results = [];
   for (const s of allSessions) {
     if (results.length >= n) break;
@@ -718,7 +806,7 @@ function getLocalRollingAvg(drillKey, n) {
 
 /** Check if a drill key is mastered (last attempt === 2, within last N cycles). */
 function isMastered(drillKey) {
-  const allSessions = sessionsForType(state.drillType);
+  const allSessions = sessionsForType(activeDrillType());
   // Find the most recent session that has this key
   for (let i = 0; i < allSessions.length; i++) {
     const entries = _cache.entries[allSessions[i].id];
@@ -755,8 +843,9 @@ function weightedPick(items) {
 }
 
 function wagonPickRandom() {
+  const total = getActiveWWTotal();
   const incomplete = [];
-  for (let i = 0; i < WW_TOTAL; i++) {
+  for (let i = 0; i < total; i++) {
     if (!isWagonSpokeComplete(i)) incomplete.push(i);
   }
   if (incomplete.length === 0) return;
@@ -764,15 +853,16 @@ function wagonPickRandom() {
 }
 
 function wagonPickWeighted() {
+  const positions = getActiveWWPositions();
   const items = [];
-  for (let i = 0; i < WW_TOTAL; i++) {
-    if (isWagonSpokeComplete(i)) continue; // already done this cycle
-    const key = wwKey(WW_POSITIONS[i]);
+  for (let i = 0; i < positions.length; i++) {
+    if (isWagonSpokeComplete(i)) continue;
+    const key = activeWWKey(positions[i]);
     items.push({ item: i, weight: getDrillWeight(key) });
   }
   const pick = weightedPick(items);
   if (pick !== null) state.wagonSpoke = pick;
-  else wagonPickRandom(); // fallback if all mastered
+  else wagonPickRandom();
 }
 
 // ── MX Random Mode ──────────────────────────────────
@@ -1197,7 +1287,7 @@ function renderTotals() {
 function renderSessionSelector() {
   const select = document.getElementById('session-select');
   select.innerHTML = '';
-  const sorted = sessionsForType(state.drillType);
+  const sorted = sessionsForType(activeDrillType());
   const sid = activeSessionId();
   for (const s of sorted) {
     const opt = document.createElement('option');
@@ -1234,8 +1324,51 @@ function switchDrillType(type) {
   } else if (type === 'mightyx') {
     mxResumeProgression();
   } else if (type === 'wagon') {
-    wagonResumeProgression();
+    ensureWagonSession().then(() => {
+      wagonResumeProgression();
+      renderAll();
+    });
+    return;
   }
+  renderAll();
+}
+
+// Ensure a session exists for the current wagon variant
+async function ensureWagonSession() {
+  const dt = activeDrillType();
+  let sid = getActiveSessionId(dt);
+  const typed = _cache.sessions.filter(s => s.drill_type === dt);
+  if (!sid || !typed.find(s => s.id === sid)) {
+    if (typed.length > 0) {
+      sid = typed[0].id;
+    } else {
+      const now = new Date();
+      const row = await dbCreateSession(dt, now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
+      _cache.sessions.push(row);
+      _cache.entries[row.id] = {};
+      sid = row.id;
+    }
+    setActiveSessionId(dt, sid);
+  }
+  // Load entries for all sessions of this variant type
+  for (const s of typed) {
+    if (_cache.entries[s.id]) continue;
+    const entries = await dbGetEntries(s.id);
+    _cache.entries[s.id] = {};
+    for (const e of entries) {
+      _cache.entries[s.id][e.drill_key] = { attempts: e.attempts, type: e.shot_type || '', note: e.note || '' };
+    }
+  }
+}
+
+async function switchWagonVariant(variant, side) {
+  state.wagonVariant = variant;
+  if (side) state.wagonSide = side;
+  state.wagonSpoke = 0;
+  state.currentInput = '2';
+  state.freshInput = true;
+  await ensureWagonSession();
+  wagonResumeProgression();
   renderAll();
 }
 
@@ -1286,10 +1419,11 @@ function hideCycleModal() {
 async function startNewCycle() {
   hideCycleModal();
   const now = new Date();
-  const row = await dbCreateSession(state.drillType, now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
+  const dt = activeDrillType();
+  const row = await dbCreateSession(dt, now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
   _cache.sessions.push(row);
   _cache.entries[row.id] = {};
-  setActiveSessionId(state.drillType, row.id);
+  setActiveSessionId(dt, row.id);
   state.currentInput = '2';
   state.freshInput = true;
   if (state.drillType === 'positions') {
@@ -1543,7 +1677,8 @@ async function resetSession() {
 }
 
 async function deleteSession() {
-  const typed = sessionsForType(state.drillType);
+  const dt = activeDrillType();
+  const typed = sessionsForType(dt);
   if (typed.length <= 1) {
     showToast('Cannot delete only session');
     return;
@@ -1553,8 +1688,8 @@ async function deleteSession() {
   await dbDeleteSession(sid);
   _cache.sessions = _cache.sessions.filter(s => s.id !== sid);
   delete _cache.entries[sid];
-  const remaining = sessionsForType(state.drillType);
-  setActiveSessionId(state.drillType, remaining[0].id);
+  const remaining = sessionsForType(dt);
+  setActiveSessionId(dt, remaining[0].id);
   // Load entries for new active session
   if (!_cache.entries[remaining[0].id]) {
     const entries = await dbGetEntries(remaining[0].id);
@@ -1572,7 +1707,7 @@ async function deleteSession() {
 }
 
 async function switchSession(id) {
-  setActiveSessionId(state.drillType, id);
+  setActiveSessionId(activeDrillType(), id);
   if (!_cache.entries[id]) {
     const entries = await dbGetEntries(id);
     _cache.entries[id] = {};
@@ -1844,7 +1979,7 @@ function renderWagonTableSvg() {
     if (!pocketSet.has('8,' + r)) svg += `<circle cx="${margin + 2 * railW + innerW - 4}" cy="${dy(r)}" r="2" fill="#8d6e63"/>`;
   }
 
-  const currentPos = WW_POSITIONS[state.wagonSpoke];
+  const currentPos = getActiveWWPositions()[state.wagonSpoke];
   const setup = wwShotSetup(state.wagonSpoke);
 
   // Highlight target pocket
@@ -1863,8 +1998,10 @@ function renderWagonTableSvg() {
   svg += `<ellipse cx="${dx(setup.cb.col) - 1.5}" cy="${dy(setup.cb.row) - 1.5}" rx="2" ry="1.5" fill="rgba(255,255,255,0.6)" transform="rotate(-30 ${dx(setup.cb.col) - 1.5} ${dy(setup.cb.row) - 1.5})"/>`;
 
   // All position markers
-  for (let i = 0; i < WW_TOTAL; i++) {
-    const pos = WW_POSITIONS[i];
+  const positions = getActiveWWPositions();
+  const wwTotal = getActiveWWTotal();
+  for (let i = 0; i < wwTotal; i++) {
+    const pos = positions[i];
     const sx = dx(pos.col), sy = dy(pos.row);
     const complete = isWagonSpokeComplete(i);
     const isCurrent = i === state.wagonSpoke;
@@ -1905,11 +2042,12 @@ function wwPosLabel(pos) {
 function renderWagonWheel() {
   const container = document.getElementById('other-drill-content');
   if (!container) return;
+  const positions = getActiveWWPositions();
+  const wwTotal = getActiveWWTotal();
   const entry = getWagonEntry(state.wagonSpoke);
-  const currentPos = WW_POSITIONS[state.wagonSpoke];
+  const currentPos = positions[state.wagonSpoke] || positions[0];
   const { done, total } = getWagonCycleProgress();
-  const setup = wwShotSetup(state.wagonSpoke);
-  const targetLabel = 'Top Side';
+  const cfg = getWWConfig();
 
   let html = `<div class="drill-layout">`;
 
@@ -1918,16 +2056,32 @@ function renderWagonWheel() {
   html += `<div class="table-container" id="wagon-table-container">${renderWagonTableSvg()}</div>`;
   html += `<div class="drill-info">`;
   html += `Position <strong>${state.wagonSpoke + 1}</strong>/${total} · ${wwPosLabel(currentPos)}`;
-  html += ` → <span style="color:#6ee7a0">${targetLabel} Pocket</span>`;
+  html += ` → <span style="color:#6ee7a0">${cfg.pocketLabel} Pocket</span>`;
   html += `</div>`;
   html += `</div>`;
 
   // Right: Controls
   html += `<div class="drill-right">`;
 
-  // Position selector grid (8 cols for 23 positions)
-  html += `<div class="drill-selector"><div class="selector-label">Position</div><div class="wagon-spoke-grid" style="grid-template-columns: repeat(8, 1fr)">`;
-  for (let i = 0; i < WW_TOTAL; i++) {
+  // Variant selector: Center / End Rail / Side Rail
+  html += `<div class="drill-selector"><div class="drill-toggle ww-variant-toggle">`;
+  html += `<button class="drill-toggle-btn ${state.wagonVariant === 'center' ? 'active' : ''}" data-ww-variant="center">Center</button>`;
+  html += `<button class="drill-toggle-btn ${state.wagonVariant === 'endRail' ? 'active' : ''}" data-ww-variant="endRail">End Rail</button>`;
+  html += `<button class="drill-toggle-btn ${state.wagonVariant === 'sideRail' ? 'active' : ''}" data-ww-variant="sideRail">Side Rail</button>`;
+  html += `</div></div>`;
+
+  // Side selector (only for endRail/sideRail)
+  if (state.wagonVariant !== 'center') {
+    html += `<div class="drill-selector"><div class="drill-toggle ww-side-toggle">`;
+    html += `<button class="drill-toggle-btn ${state.wagonSide === 'left' ? 'active' : ''}" data-ww-side="left">← Left</button>`;
+    html += `<button class="drill-toggle-btn ${state.wagonSide === 'right' ? 'active' : ''}" data-ww-side="right">Right →</button>`;
+    html += `</div></div>`;
+  }
+
+  // Position selector grid
+  const gridCols = wwTotal <= 20 ? 7 : 8;
+  html += `<div class="drill-selector"><div class="selector-label">Position</div><div class="wagon-spoke-grid" style="grid-template-columns: repeat(${gridCols}, 1fr)">`;
+  for (let i = 0; i < wwTotal; i++) {
     const complete = isWagonSpokeComplete(i);
     html += `<button class="wagon-spoke-btn ${i === state.wagonSpoke ? 'selected' : ''} ${complete ? 'done' : ''}" data-spoke="${i}">${complete ? '✓' : i + 1}</button>`;
   }
@@ -2037,6 +2191,20 @@ function attachDrillHandlers(type) {
         renderAll();
       });
     });
+    container.querySelectorAll('[data-ww-variant]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = btn.dataset.wwVariant;
+        if (v === state.wagonVariant) return;
+        switchWagonVariant(v, v === 'center' ? null : state.wagonSide);
+      });
+    });
+    container.querySelectorAll('[data-ww-side]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const s = btn.dataset.wwSide;
+        if (s === state.wagonSide) return;
+        switchWagonVariant(state.wagonVariant, s);
+      });
+    });
   }
 
   // Numpad digits
@@ -2106,9 +2274,10 @@ function pressSaveWagon() {
   state.freshInput = true;
   renderAll();
 
-  const wwTotal = WW_TOTAL;
+  const wwTotal = getActiveWWTotal();
   if (isWagonCycleComplete()) {
-    showDrillCycleComplete(`All ${wwTotal} Wagon Wheel positions finished!`, wwTotal, getWagonSessionTotal());
+    const cfg = getWWConfig();
+    showDrillCycleComplete(`All ${wwTotal} ${cfg.label} positions finished!`, wwTotal, getWagonSessionTotal());
   }
 }
 
