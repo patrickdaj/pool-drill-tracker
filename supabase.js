@@ -91,16 +91,19 @@ async function dbDeleteSession(sessionId) {
 async function dbSaveEntry(sessionId, drillKey, attempts, shotType, note) {
   if (_userId && _online) {
     // Upsert: if entry for this session+key exists, update it
-    const { data: existing } = await sb.from('drill_entries')
+    const { data: existing, error: selErr } = await sb.from('drill_entries')
       .select('id')
       .eq('session_id', sessionId)
       .eq('drill_key', drillKey)
       .maybeSingle();
-    if (existing) {
-      await sb.from('drill_entries').update({ attempts, shot_type: shotType, note: note || '' })
+    if (selErr) {
+      console.warn('dbSaveEntry select failed:', selErr.message);
+    } else if (existing) {
+      const { error } = await sb.from('drill_entries').update({ attempts, shot_type: shotType, note: note || '' })
         .eq('id', existing.id);
+      if (error) console.warn('dbSaveEntry update failed:', error.message);
     } else {
-      await sb.from('drill_entries').insert({
+      const { error } = await sb.from('drill_entries').insert({
         session_id: sessionId,
         user_id: _userId,
         drill_key: drillKey,
@@ -108,6 +111,7 @@ async function dbSaveEntry(sessionId, drillKey, attempts, shotType, note) {
         shot_type: shotType,
         note: note || ''
       });
+      if (error) console.warn('dbSaveEntry insert failed:', error.message);
     }
   }
   _localSaveEntry(sessionId, drillKey, attempts, shotType, note);
@@ -119,7 +123,15 @@ async function dbGetEntries(sessionId) {
       .select('*')
       .eq('session_id', sessionId);
     if (!error && data) {
-      _localCacheEntries(sessionId, data);
+      // Don't overwrite local entries with empty remote — local may have unsynced data
+      const local = _localGetEntries(sessionId);
+      if (data.length > 0) {
+        _localCacheEntries(sessionId, data);
+        return data;
+      } else if (local.length > 0) {
+        // Local has data that remote doesn't — return local and let sync push it
+        return local;
+      }
       return data;
     }
   }
@@ -359,11 +371,12 @@ async function syncFromLocal() {
         .eq('drill_key', e.drill_key)
         .maybeSingle();
       if (existing) {
-        await sb.from('drill_entries').update({
+        const { error: updErr } = await sb.from('drill_entries').update({
           attempts: e.attempts, shot_type: e.shot_type, note: e.note || ''
         }).eq('id', existing.id);
+        if (updErr) console.warn('syncFromLocal update failed:', updErr.message);
       } else {
-        await sb.from('drill_entries').insert({
+        const { error: insErr } = await sb.from('drill_entries').insert({
           session_id: s.id,
           user_id: _userId,
           drill_key: e.drill_key,
@@ -371,6 +384,7 @@ async function syncFromLocal() {
           shot_type: e.shot_type || '',
           note: e.note || ''
         });
+        if (insErr) console.warn('syncFromLocal insert failed:', insErr.message);
       }
     }
   }

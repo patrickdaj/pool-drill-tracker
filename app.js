@@ -494,6 +494,8 @@ async function loadAppData() {
   if (_appDataLoaded) return;
   _appDataLoaded = true;
   await dbInit();
+  // Push any local-only data to Supabase before fetching
+  await syncFromLocal();
   _cache.config = await dbGetConfig();
   _cache.sessions = await dbGetAllSessions();
 
